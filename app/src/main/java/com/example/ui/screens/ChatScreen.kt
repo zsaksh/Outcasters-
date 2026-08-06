@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Psychology
@@ -45,7 +46,7 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatScreen(navController: NavController, sessionId: Long? = null) {
+fun ChatScreen(navController: NavController, sessionId: Long? = null, mode: String = "chat", targetLanguage: String = "French") {
     val context = LocalContext.current
     val app = context.applicationContext as OutcastersApplication
     val chatDao = app.container.chatDao
@@ -56,6 +57,8 @@ fun ChatScreen(navController: NavController, sessionId: Long? = null) {
     var currentSessionId by remember { mutableStateOf(sessionId) }
     var messages by remember { mutableStateOf<List<ChatMessageEntity>>(emptyList()) }
     var inputText by remember { mutableStateOf("") }
+    var currentMode by remember { mutableStateOf(mode) }
+    var currentTargetLanguage by remember { mutableStateOf(targetLanguage) }
     var isGenerating by remember { mutableStateOf(false) }
     var streamingResponse by remember { mutableStateOf("") }
     
@@ -156,6 +159,56 @@ fun ChatScreen(navController: NavController, sessionId: Long? = null) {
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
+
+            if (currentMode == "language" || currentMode == "translate" || currentMode == "vocabulary" || currentMode == "grammar" || currentMode == "practice") {
+                val languages = listOf("French", "Spanish", "Japanese", "German", "Mandarin")
+                var expanded by remember { mutableStateOf(false) }
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Language Mode:", fontWeight = FontWeight.SemiBold, color = TextPrimary)
+                    Box {
+                        TextButton(onClick = { expanded = true }) {
+                            Text(currentTargetLanguage)
+                            Icon(Icons.Filled.ArrowDropDown, contentDescription = "Select Language")
+                        }
+                        DropdownMenu(
+                            expanded = expanded,
+                            onDismissRequest = { expanded = false }
+                        ) {
+                            languages.forEach { lang ->
+                                DropdownMenuItem(
+                                    text = { Text(lang) },
+                                    onClick = {
+                                        currentTargetLanguage = lang
+                                        expanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+                
+                // Tasks row
+                val langTasks = listOf("Translate", "Vocabulary", "Grammar", "Practice")
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    langTasks.forEach { task ->
+                        val isSelected = currentMode == task.lowercase() || (currentMode == "language" && task == "Practice")
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = { currentMode = task.lowercase() },
+                            label = { Text(task) }
+                        )
+                    }
+                }
+                HorizontalDivider()
+            }
+
             LazyColumn(
                 modifier = Modifier
                     .weight(1f)
@@ -320,8 +373,11 @@ fun ChatScreen(navController: NavController, sessionId: Long? = null) {
                                         try {
                                             isGenerating = true
                                             streamingResponse = ""
-                                            val systemPrompt = "You are an expert tutor in Academic, Language, and Interview topics. Provide step-by-step explanations, grammar breakdowns, and use the STAR method where appropriate. Keep responses concise and professional.\n\n"
-                                            val responseFlow = inferenceEngine.generate(systemPrompt + text)
+                                            val promptBuilder = com.example.backend.inference.PromptBuilder()
+                                            val history = messages.map { com.example.backend.inference.ChatMessage(it.role, it.content) }
+                                            val manifest = activeModel ?: com.example.backend.models.ModelManifest(modelId = "dummy", displayName = "Dummy", sourceUrl = "", fileName = "", chatTemplate = "fallback")
+                                            val builtPrompt = promptBuilder.buildPrompt(manifest, history, text, currentMode, currentTargetLanguage)
+                                            val responseFlow = inferenceEngine.generate(builtPrompt)
                                             var fullResponse = ""
                                             responseFlow.collect { word -> 
                                                 fullResponse += word 

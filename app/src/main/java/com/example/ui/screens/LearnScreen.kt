@@ -127,16 +127,16 @@ fun LearnScreen(navController: NavController) {
 fun ConceptGrid(navController: NavController) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            LearnActionCard(navController, modifier = Modifier.weight(1f), icon = Icons.Filled.Lightbulb, title = "Explain Simply", tint = Color(0xFFFFB74D))
-            LearnActionCard(navController, modifier = Modifier.weight(1f), icon = Icons.Filled.FormatListNumbered, title = "Step by Step", tint = AccentPurple)
+            LearnActionCard(navController, modifier = Modifier.weight(1f), icon = Icons.Filled.Lightbulb, title = "Explain Simply", tint = Color(0xFFFFB74D), route = "chat?mode=concept")
+            LearnActionCard(navController, modifier = Modifier.weight(1f), icon = Icons.Filled.FormatListNumbered, title = "Step by Step", tint = AccentPurple, route = "chat?mode=concept")
         }
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            LearnActionCard(navController, modifier = Modifier.weight(1f), icon = Icons.Filled.AutoAwesome, title = "Examples", tint = Color(0xFFAED581))
-            LearnActionCard(navController, modifier = Modifier.weight(1f), icon = Icons.AutoMirrored.Filled.CompareArrows, title = "Compare Topics", tint = AccentOrange)
+            LearnActionCard(navController, modifier = Modifier.weight(1f), icon = Icons.Filled.AutoAwesome, title = "Examples", tint = Color(0xFFAED581), route = "chat?mode=concept")
+            LearnActionCard(navController, modifier = Modifier.weight(1f), icon = Icons.AutoMirrored.Filled.CompareArrows, title = "Compare Topics", tint = AccentOrange, route = "chat?mode=concept")
         }
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            LearnActionCard(navController, modifier = Modifier.weight(1f), icon = Icons.Filled.QuestionMark, title = "Quiz Me", tint = Color(0xFFF06292))
-            LearnActionCard(navController, modifier = Modifier.weight(1f), icon = Icons.Filled.Summarize, title = "Summarize", tint = AccentTeal)
+            LearnActionCard(navController, modifier = Modifier.weight(1f), icon = Icons.Filled.QuestionMark, title = "Quiz Me", tint = Color(0xFFF06292), route = "chat?mode=quiz")
+            LearnActionCard(navController, modifier = Modifier.weight(1f), icon = Icons.Filled.Summarize, title = "Summarize", tint = AccentTeal, route = "chat?mode=concept")
         }
     }
 }
@@ -145,11 +145,11 @@ fun ConceptGrid(navController: NavController) {
 fun LanguageGrid(navController: NavController) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            LearnActionCard(navController, modifier = Modifier.weight(1f), icon = Icons.Filled.Lightbulb, title = "Translate", tint = AccentTeal)
-            LearnActionCard(navController, modifier = Modifier.weight(1f), icon = Icons.Filled.FormatListNumbered, title = "Vocabulary", tint = AccentPurple)
+            LearnActionCard(navController, modifier = Modifier.weight(1f), icon = Icons.Filled.Lightbulb, title = "Translate", tint = AccentTeal, route = "chat?mode=translate")
+            LearnActionCard(navController, modifier = Modifier.weight(1f), icon = Icons.Filled.FormatListNumbered, title = "Vocabulary", tint = AccentPurple, route = "chat?mode=vocabulary")
         }
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            LearnActionCard(navController, modifier = Modifier.weight(1f), icon = Icons.Filled.AutoAwesome, title = "Grammar", tint = AccentOrange)
+            LearnActionCard(navController, modifier = Modifier.weight(1f), icon = Icons.Filled.AutoAwesome, title = "Grammar", tint = AccentOrange, route = "chat?mode=grammar")
             LearnActionCard(navController, modifier = Modifier.weight(1f), icon = Icons.AutoMirrored.Filled.CompareArrows, title = "ImmersionTalk", tint = Color(0xFFAED581), route = "immersion_talk")
         }
     }
@@ -258,9 +258,9 @@ fun InterviewDashboard(navController: NavController) {
         // Quick Drill Cards
         Text("Quick Drills", fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = TextPrimary, modifier = Modifier.padding(top = 8.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            LearnActionCard(navController, modifier = Modifier.weight(1f), icon = Icons.Filled.Lightbulb, title = "System Design", tint = AccentOrange)
-            LearnActionCard(navController, modifier = Modifier.weight(1f), icon = Icons.Filled.FormatListNumbered, title = "Case Math", tint = Color(0xFFAED581))
-            LearnActionCard(navController, modifier = Modifier.weight(1f), icon = Icons.Filled.AutoAwesome, title = "STAR Refiner", tint = AccentPurple)
+            LearnActionCard(navController, modifier = Modifier.weight(1f), icon = Icons.Filled.Lightbulb, title = "System Design", tint = AccentOrange, route = "chat?mode=interview")
+            LearnActionCard(navController, modifier = Modifier.weight(1f), icon = Icons.Filled.FormatListNumbered, title = "Case Math", tint = Color(0xFFAED581), route = "chat?mode=interview")
+            LearnActionCard(navController, modifier = Modifier.weight(1f), icon = Icons.Filled.AutoAwesome, title = "STAR Refiner", tint = AccentPurple, route = "chat?mode=interview")
         }
     }
 }

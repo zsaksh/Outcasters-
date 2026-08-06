@@ -240,7 +240,7 @@ fun CameraPreview(navController: NavController) {
                                         )
                                     )
                                     
-                                    navController.navigate("chat/$sessionId") {
+                                    navController.navigate("chat/$sessionId?mode=scan_solve") {
                                         popUpTo("home")
                                     }
                                 }

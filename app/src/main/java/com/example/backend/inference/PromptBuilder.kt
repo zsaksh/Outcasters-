@@ -6,12 +6,28 @@ data class ChatMessage(val role: String, val content: String)
 
 class PromptBuilder : IPromptBuilder {
     
+    private fun getSystemContext(mode: String, targetLanguage: String): String {
+        val basePrompt = "You are Outcasters AI, a private local study assistant. Answer clearly, directly, and helpfully. Never mention internal runtime details, threads, context size, token counts, logs, or system internals. Adapt your answer to the selected mode. Keep the response natural, correct, and concise unless the user asks for more detail.\n\n"
+        
+        return basePrompt + when (mode.lowercase()) {
+            "concept" -> "Mode: Concept Learning.\nExplain simply, give step-by-step reasoning, provide examples, summarize key points, and avoid unnecessary jargon.\nOutput structure:\n- Direct Answer\n- Explanation\n- Example\n- Key Idea\n- Short Summary"
+            "language", "translate", "vocabulary", "grammar", "practice" -> "Mode: Language Learning ($targetLanguage).\nBehave like a language tutor. Respond in the selected target language when appropriate. Explain grammar clearly, give translations, provide short examples, and generate practice exercises if requested.\nOutput structure:\n- Translation\n- Explanation\n- Grammar Note\n- Example Sentence\n- Practice Prompt"
+            "interview" -> "Mode: Interview Prep.\nGive concise, structured answers. Use a professional tone, provide feedback, and avoid overly long explanations unless asked.\nOutput structure:\n- Short Answer\n- Strong Version\n- Follow-up Tip"
+            "scan_solve" -> "Mode: Scan & Solve.\nSolve the question directly. Show step-by-step logic, explain formulas or concepts, and avoid meta commentary."
+            "quiz" -> "Mode: Quiz.\nGenerate a short quiz based on the user's topic. Wait for their answer, then provide constructive feedback and the correct answer."
+            else -> "Mode: General Chat.\nBe conversational, helpful, and concise."
+        }
+    }
+    
     override fun buildPrompt(
         manifest: ModelManifest, 
         history: List<ChatMessage>, 
         newTask: String,
-        systemContext: String?
+        mode: String,
+        targetLanguage: String
     ): String {
+        val systemContext = getSystemContext(mode, targetLanguage)
+        
         return when (manifest.chatTemplate.lowercase()) {
             "chatml" -> buildChatML(history, newTask, systemContext)
             "llama3" -> buildLlama3(history, newTask, systemContext)
@@ -22,11 +38,9 @@ class PromptBuilder : IPromptBuilder {
         }
     }
 
-    private fun buildGemma(history: List<ChatMessage>, newTask: String, systemContext: String?): String {
+    private fun buildGemma(history: List<ChatMessage>, newTask: String, systemContext: String): String {
         val sb = StringBuilder()
-        // Gemma 2 early quants often do not support a native system prompt, 
-        // but if provided, it's typically pre-pended or appended to the first user turn.
-        val contextPrefix = if (systemContext != null) "${systemContext}\n\n" else ""
+        val contextPrefix = "${systemContext}\n\n"
         
         history.forEachIndexed { index, msg ->
             val roleTag = if (msg.role == "user") "user" else "model"
@@ -38,7 +52,7 @@ class PromptBuilder : IPromptBuilder {
         }
         
         sb.append("<start_of_turn>user\n")
-        if (history.isEmpty() && contextPrefix.isNotEmpty()) {
+        if (history.isEmpty()) {
             sb.append(contextPrefix)
         }
         sb.append("${newTask}<end_of_turn>\n")
@@ -46,12 +60,10 @@ class PromptBuilder : IPromptBuilder {
         return sb.toString()
     }
 
-    private fun buildLiquid(history: List<ChatMessage>, newTask: String, systemContext: String?): String {
-        // Liquid AI LFMs handling (often simplified ChatML or raw sequences)
+    private fun buildLiquid(history: List<ChatMessage>, newTask: String, systemContext: String): String {
         val sb = StringBuilder()
-        if (systemContext != null) {
-            sb.append("System: ${systemContext}\n\n")
-        }
+        sb.append("System: ${systemContext}\n\n")
+        
         history.forEach { msg ->
             val role = if (msg.role == "user") "User" else "Assistant"
             sb.append("${role}: ${msg.content}\n\n")
@@ -60,11 +72,10 @@ class PromptBuilder : IPromptBuilder {
         return sb.toString()
     }
 
-    private fun buildChatML(history: List<ChatMessage>, newTask: String, systemContext: String?): String {
+    private fun buildChatML(history: List<ChatMessage>, newTask: String, systemContext: String): String {
         val sb = StringBuilder()
-        if (systemContext != null) {
-            sb.append("<|im_start|>system\n${systemContext}<|im_end|>\n")
-        }
+        sb.append("<|im_start|>system\n${systemContext}<|im_end|>\n")
+        
         history.forEach { msg ->
             sb.append("<|im_start|>${msg.role}\n${msg.content}<|im_end|>\n")
         }
@@ -73,12 +84,11 @@ class PromptBuilder : IPromptBuilder {
         return sb.toString()
     }
 
-    private fun buildLlama3(history: List<ChatMessage>, newTask: String, systemContext: String?): String {
+    private fun buildLlama3(history: List<ChatMessage>, newTask: String, systemContext: String): String {
         val sb = StringBuilder()
         sb.append("<|begin_of_text|>")
-        if (systemContext != null) {
-            sb.append("<|start_header_id|>system<|end_header_id|>\n\n${systemContext}<|eot_id|>")
-        }
+        sb.append("<|start_header_id|>system<|end_header_id|>\n\n${systemContext}<|eot_id|>")
+        
         history.forEach { msg ->
             sb.append("<|start_header_id|>${msg.role}<|end_header_id|>\n\n${msg.content}<|eot_id|>")
         }
@@ -87,11 +97,10 @@ class PromptBuilder : IPromptBuilder {
         return sb.toString()
     }
 
-    private fun buildPhi3(history: List<ChatMessage>, newTask: String, systemContext: String?): String {
+    private fun buildPhi3(history: List<ChatMessage>, newTask: String, systemContext: String): String {
         val sb = StringBuilder()
-        if (systemContext != null) {
-            sb.append("<|system|>\n${systemContext}<|end|>\n")
-        }
+        sb.append("<|system|>\n${systemContext}<|end|>\n")
+        
         history.forEach { msg ->
             val roleTag = if (msg.role == "user") "<|user|>" else "<|assistant|>"
             sb.append("${roleTag}\n${msg.content}<|end|>\n")
@@ -100,11 +109,10 @@ class PromptBuilder : IPromptBuilder {
         return sb.toString()
     }
 
-    private fun buildFallback(history: List<ChatMessage>, newTask: String, systemContext: String?): String {
+    private fun buildFallback(history: List<ChatMessage>, newTask: String, systemContext: String): String {
         val sb = StringBuilder()
-        if (systemContext != null) {
-            sb.append("SYSTEM: ${systemContext}\n")
-        }
+        sb.append("SYSTEM: ${systemContext}\n")
+        
         history.forEach { msg ->
             sb.append("${msg.role.uppercase()}: ${msg.content}\n")
         }

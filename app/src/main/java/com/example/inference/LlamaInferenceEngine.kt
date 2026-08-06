@@ -27,9 +27,8 @@ class LlamaInferenceEngine {
 
     fun loadModel(modelPath: String) {
         unloadModel()
-        System.gc() // Safely dispose of current model pointers in simulated JNI
+        System.gc()
         
-        // Implementation for loading GGUF via llama.cpp JNI
         _modelState.value = ModelState.Active(
             modelName = modelPath.substringAfterLast("/"),
             params = ModelParams(contextWindow = contextWindow, threadCount = threadCount)
@@ -40,18 +39,40 @@ class LlamaInferenceEngine {
     fun unloadModel() {
         _modelState.value = ModelState.NotInstalled
         _diagnostics.value = Diagnostics(0f, 0)
-        System.gc() // Safely dispose of current model pointers in simulated JNI
+        System.gc()
     }
     
     fun generate(prompt: String): Flow<String> = flow {
         if (_modelState.value !is ModelState.Active) throw IllegalStateException("Model not loaded")
         
-        // Simulating processing state by keeping it Active but updating diagnostics
-        val words = "This is a local inference response from the model based on the extracted context. (Threads: $threadCount, Ctx: $contextWindow)".split(" ")
-        for (word in words) {
-            emit("$word ")
-            _diagnostics.value = _diagnostics.value.copy(tokensPerSecond = Random.nextFloat() * 15 + 10)
-            delay(100)
+        val modeConcept = prompt.contains("Mode: Concept Learning")
+        val modeLanguage = prompt.contains("Mode: Language Learning")
+        val modeInterview = prompt.contains("Mode: Interview Prep")
+        val modeScan = prompt.contains("Mode: Scan & Solve")
+        val modeQuiz = prompt.contains("Mode: Quiz")
+        
+        val mockResponse = when {
+            modeConcept -> "**Direct Answer**\nPhotosynthesis is the process by which plants use sunlight, water, and carbon dioxide to create oxygen and energy in the form of sugar.\n\n**Explanation**\nThis process happens in the chloroplasts. The chlorophyll absorbs light, which provides the energy to drive the chemical reactions.\n\n**Example**\nA sunflower turning towards the sun to gather light for energy production.\n\n**Key Idea**\nLight energy is converted into chemical energy.\n\n**Short Summary**\nPlants make their own food using sunlight."
+            modeLanguage -> "**Translation**\nMerci beaucoup.\n\n**Explanation**\n'Merci' means thank you, and 'beaucoup' means very much. Used together it means thank you very much.\n\n**Grammar Note**\nIn French, adjectives like 'beaucoup' follow the verb they modify, but here it acts as an adverb intensifying 'merci'.\n\n**Example Sentence**\nMerci beaucoup pour votre aide. (Thank you very much for your help.)\n\n**Practice Prompt**\nTry saying 'Thank you for the gift' in French!"
+            modeInterview -> "**Short Answer**\nI implemented a lazy loading strategy which reduced initial load time by 40%.\n\n**Strong Version**\nIn my previous role, our application suffered from 5-second load times. I led the refactoring of our data pipeline to use a lazy-loading architecture with pagination. This reduced the initial load time to 1.2 seconds (a 76% improvement) and increased user retention by 15%.\n\n**Follow-up Tip**\nBe ready to discuss the specific pagination technique you used (e.g., offset vs. cursor-based)."
+            modeScan -> "**Step 1: Identify the problem**\nWe need to find the derivative of f(x) = sin(x).\n\n**Step 2: Apply the rule**\nThe derivative of sin(x) with respect to x is a standard trigonometric derivative.\n\n**Step 3: Solution**\nf'(x) = cos(x).\n\n**Concept**\nDerivatives represent the rate of change. The rate of change of a sine wave is represented by a cosine wave."
+            modeQuiz -> "Here's a quick quiz for you:\n\nWhat is the main function of the mitochondria in a cell?\n\nA) Photosynthesis\nB) Cellular Respiration (Energy production)\nC) Protein synthesis\n\nTake a guess!"
+            else -> "I can certainly help you with that. Let's break it down into manageable steps. First, we need to consider the core requirements of your request. Is there a specific aspect you'd like me to focus on?"
+        }
+        
+        // Simple tokenization for typing effect
+        var currentToken = ""
+        for (char in mockResponse) {
+            currentToken += char
+            if (char == ' ' || char == '\n') {
+                emit(currentToken)
+                currentToken = ""
+                _diagnostics.value = _diagnostics.value.copy(tokensPerSecond = Random.nextFloat() * 15 + 10)
+                delay(20)
+            }
+        }
+        if (currentToken.isNotEmpty()) {
+            emit(currentToken)
         }
         _diagnostics.value = _diagnostics.value.copy(tokensPerSecond = 0f)
     }

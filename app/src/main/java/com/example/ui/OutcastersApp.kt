@@ -19,20 +19,22 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import androidx.navigation.NavType
 import com.example.ui.screens.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OutcastersApp() {
     val navController = rememberNavController()
-
+    
     val items = listOf(
         "home" to "Home",
         "learn" to "Learn",
         "models" to "Models",
         "settings" to "Settings"
     )
-
+    
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     val showBottomBar = currentRoute in items.map { it.first }
@@ -100,7 +102,19 @@ fun OutcastersApp() {
             composable("update_feed") { UpdateFeedScreen(navController) }
             
             composable("scan") { ScanScreen(navController) }
-            composable("chat") { ChatScreen(navController) }
+            
+            composable(
+                "chat?mode={mode}&lang={lang}",
+                arguments = listOf(
+                    navArgument("mode") { defaultValue = "chat" },
+                    navArgument("lang") { defaultValue = "French" }
+                )
+            ) { backStackEntry ->
+                val mode = backStackEntry.arguments?.getString("mode") ?: "chat"
+                val lang = backStackEntry.arguments?.getString("lang") ?: "French"
+                ChatScreen(navController, null, mode, lang)
+            }
+            
             composable("immersion_talk") { ImmersionTalkScreen(navController) }
             composable("debrief") { DebriefScreen(navController) }
             composable("mock_interview_setup") { MockInterviewSetupScreen(navController) }
@@ -108,9 +122,19 @@ fun OutcastersApp() {
             composable("interview_feedback") { InterviewFeedbackScreen(navController) }
             composable("interview_feedback_list") { InterviewFeedbackListScreen(navController) }
             composable("library") { LibraryScreen(navController) }
-            composable("chat/{sessionId}") { backStackEntry ->
+            
+            composable(
+                "chat/{sessionId}?mode={mode}&lang={lang}",
+                arguments = listOf(
+                    navArgument("sessionId") { type = NavType.StringType },
+                    navArgument("mode") { defaultValue = "chat" },
+                    navArgument("lang") { defaultValue = "French" }
+                )
+            ) { backStackEntry ->
                 val sessionId = backStackEntry.arguments?.getString("sessionId")?.toLongOrNull()
-                ChatScreen(navController, sessionId)
+                val mode = backStackEntry.arguments?.getString("mode") ?: "chat"
+                val lang = backStackEntry.arguments?.getString("lang") ?: "French"
+                ChatScreen(navController, sessionId, mode, lang)
             }
         }
     }

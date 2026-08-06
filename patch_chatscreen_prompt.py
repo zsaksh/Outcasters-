@@ -1,0 +1,18 @@
+import re
+
+with open("app/src/main/java/com/example/ui/screens/ChatScreen.kt", "r") as f:
+    content = f.read()
+
+replacement = """                                        try {
+                                            isGenerating = true
+                                            streamingResponse = ""
+                                            val promptBuilder = com.example.backend.inference.PromptBuilder()
+                                            val history = messages.map { com.example.backend.inference.ChatMessage(it.role, it.content) }
+                                            val manifest = activeModel ?: com.example.backend.models.ModelManifest(modelId = "dummy", displayName = "Dummy", sourceUrl = "", fileName = "", chatTemplate = "fallback")
+                                            val builtPrompt = promptBuilder.buildPrompt(manifest, history, text, currentMode, currentTargetLanguage)
+                                            val responseFlow = inferenceEngine.generate(builtPrompt)"""
+
+content = re.sub(r'                                        try \{\n                                            isGenerating = true\n                                            streamingResponse = ""\n                                            val promptBuilder = com.example.backend.inference.PromptBuilder\(\)\n                                            val history = messages.map \{ com.example.backend.inference.ChatMessage\(it.role, it.content\) \}\n                                            val manifest = activeModel \?\: com.example.backend.models.ModelManifest\("dummy", "Dummy", "", "fallback", "ready", true\)\n                                            val builtPrompt = promptBuilder.buildPrompt\(manifest, history, text, currentMode, currentTargetLanguage\)\n                                            val responseFlow = inferenceEngine.generate\(builtPrompt\)', replacement, content)
+
+with open("app/src/main/java/com/example/ui/screens/ChatScreen.kt", "w") as f:
+    f.write(content)
