@@ -53,9 +53,10 @@ class LlamaInferenceEngine {
         val modeQuiz = prompt.contains("Mode: Quiz")
         
         val lowerPrompt = prompt.lowercase()
-        val isCalculus = lowerPrompt.contains("calculus") || lowerPrompt.contains("derivative") || lowerPrompt.contains("integral")
-        val isPhotosynthesis = lowerPrompt.contains("photosynthesis") || lowerPrompt.contains("plant")
-        val isFz = lowerPrompt.contains("fz") || lowerPrompt.contains("analytic")
+        val newTaskLower = lowerPrompt.substringAfterLast("<|im_start|>user\n").substringAfterLast("user\n").substringAfterLast("user:").substringAfterLast("<|user|>").substringAfterLast("<|start_header_id|>user<|end_header_id|>")
+        val isCalculus = newTaskLower.contains("calculus") || newTaskLower.contains("derivative") || newTaskLower.contains("integral")
+        val isPhotosynthesis = newTaskLower.contains("photosynthesis") || newTaskLower.contains("plant")
+        val isFz = newTaskLower.contains("fz") || newTaskLower.contains("analytic")
         
         val mockResponse = when {
             isCalculus -> "**Direct Answer**\nCalculus is the mathematical study of continuous change.\n\n**Explanation**\nIt has two major branches, differential calculus and integral calculus.\n\n**Example**\nFinding the speed of a falling object at a specific moment in time.\n\n**Key Idea**\nCalculus allows us to model and analyze systems that are constantly changing.\n\n**Short Summary**\nCalculus is the mathematics of change and motion."

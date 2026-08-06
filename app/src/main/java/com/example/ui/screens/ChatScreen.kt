@@ -596,7 +596,16 @@ fun ChatScreen(navController: NavController, sessionId: Long? = null, mode: Stri
                                                 ocrContext = scannedText,
                                                 retrievalContext = ""
                                             )
-                                            val responseFlow = inferenceEngine.generate(routedPrompt.builtPrompt)
+                                            val llamaBridge = com.example.inference.LlamaBridge()
+                                            llamaBridge.clearKvCache()
+                                            
+                                            val systemContext = "You are Outcasters AI, a private local study assistant."
+                                            val formattedPrompt = com.example.inference.ChatTemplateFormatter.formatSmolLM2(
+                                                messages = history.takeLast(2) + com.example.backend.inference.ChatMessage("user", text),
+                                                systemPrompt = systemContext
+                                            )
+                                            
+                                            val responseFlow = inferenceEngine.generate(formattedPrompt)
                                             var fullResponse = ""
                                             responseFlow.collect { word -> 
                                                 fullResponse += word 

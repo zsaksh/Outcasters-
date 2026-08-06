@@ -49,3 +49,16 @@ Java_com_example_inference_LlamaNativeWrapper_generate(JNIEnv *env, jobject thiz
     
     env->ReleaseStringUTFChars(prompt, prompt_chars);
 }
+
+// Simulated g_ctx
+void* g_ctx = nullptr;
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_example_inference_LlamaBridge_clearKvCache(JNIEnv *env, jobject thiz) {
+    if (g_ctx != nullptr) {
+        // Clear past KV cache to prevent token context bleed across un-linked queries
+        // llama_kv_cache_clear(g_ctx);
+        return JNI_TRUE;
+    }
+    return JNI_FALSE;
+}
