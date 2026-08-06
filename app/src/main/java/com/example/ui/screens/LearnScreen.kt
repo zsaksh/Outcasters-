@@ -41,8 +41,8 @@ fun LearnScreen(navController: NavController) {
     val container = (context.applicationContext as com.example.OutcastersApplication).container
     val mostRecentMessage by container.chatDao.getMostRecentMessage().collectAsState(initial = null)
 
-    var selectedMode by remember { mutableStateOf("Concept") }
-    val modes = listOf("Concept", "Language", "Interview")
+    var selectedMode by remember { mutableStateOf("Language") }
+    val modes = listOf("Language", "Interview")
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background
@@ -95,8 +95,7 @@ fun LearnScreen(navController: NavController) {
             // Mode Content Grid
             item {
                 when (selectedMode) {
-                    "Concept" -> ConceptGrid(navController)
-                    "Language" -> LanguageGrid(navController)
+                                        "Language" -> LanguageGrid(navController)
                     "Interview" -> InterviewDashboard(navController)
                 }
             }
@@ -119,24 +118,6 @@ fun LearnScreen(navController: NavController) {
                     Spacer(modifier = Modifier.height(16.dp))
                 }
             }
-        }
-    }
-}
-
-@Composable
-fun ConceptGrid(navController: NavController) {
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            LearnActionCard(navController, modifier = Modifier.weight(1f), icon = Icons.Filled.Lightbulb, title = "Explain Simply", tint = Color(0xFFFFB74D), route = "chat?mode=concept")
-            LearnActionCard(navController, modifier = Modifier.weight(1f), icon = Icons.Filled.FormatListNumbered, title = "Step by Step", tint = AccentPurple, route = "chat?mode=concept")
-        }
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            LearnActionCard(navController, modifier = Modifier.weight(1f), icon = Icons.Filled.AutoAwesome, title = "Examples", tint = Color(0xFFAED581), route = "chat?mode=concept")
-            LearnActionCard(navController, modifier = Modifier.weight(1f), icon = Icons.AutoMirrored.Filled.CompareArrows, title = "Compare Topics", tint = AccentOrange, route = "chat?mode=concept")
-        }
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            LearnActionCard(navController, modifier = Modifier.weight(1f), icon = Icons.Filled.QuestionMark, title = "Quiz Me", tint = Color(0xFFF06292), route = "chat?mode=quiz")
-            LearnActionCard(navController, modifier = Modifier.weight(1f), icon = Icons.Filled.Summarize, title = "Summarize", tint = AccentTeal, route = "chat?mode=concept")
         }
     }
 }

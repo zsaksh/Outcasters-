@@ -40,6 +40,9 @@ fun HomeScreen(navController: NavController) {
     val inferenceEngine = app.container.inferenceEngine
     val modelState by inferenceEngine.modelState.collectAsState()
 
+
+    val recentSessions by app.container.chatDao.getAllSessions().collectAsState(initial = emptyList())
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
@@ -202,14 +205,29 @@ fun HomeScreen(navController: NavController) {
                 }
             }
 
+
             item {
+
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    RecentActivityItem(title = "Derivative of sin(x)", time = "2m ago")
-                    RecentActivityItem(title = "Photosynthesis Process", time = "1h ago")
-                    RecentActivityItem(title = "French Vocabulary", time = "Yesterday")
+                    val filteredSessions = recentSessions.filter { 
+                        it.title.isNotBlank() && !it.title.contains("Context from", ignoreCase = true) && !it.title.contains("Debug", ignoreCase = true)
+                    }
+                    if (filteredSessions.isEmpty()) {
+                        Text("No recent activity", color = TextSecondary, fontSize = 14.sp)
+                    } else {
+                        filteredSessions.take(3).forEach { session ->
+                            RecentActivityItem(
+
+                                title = session.title,
+                                time = android.text.format.DateUtils.getRelativeTimeSpanString(session.timestamp).toString(),
+                                onClick = { navController.navigate("chat/${session.id}") }
+                            )
+                        }
+                    }
                 }
                 Spacer(modifier = Modifier.height(16.dp))
             }
+
         }
     }
 }
@@ -242,13 +260,13 @@ fun QuickActionCard(modifier: Modifier, icon: ImageVector, title: String, subtit
 }
 
 @Composable
-fun RecentActivityItem(title: String, time: String) {
+fun RecentActivityItem(title: String, time: String, onClick: () -> Unit = {}) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.small)
             .background(MaterialTheme.colorScheme.surface)
-            .clickable { }
+            .clickable { onClick() }
             .padding(16.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically

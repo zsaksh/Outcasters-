@@ -373,18 +373,28 @@ fun ChatScreen(navController: NavController, sessionId: Long? = null, mode: Stri
                                         try {
                                             isGenerating = true
                                             streamingResponse = ""
-                                            val promptBuilder = com.example.backend.inference.PromptBuilder()
+                                            val promptRouter = com.example.backend.inference.PromptRouter()
+                                            val postProcessor = com.example.backend.inference.PostProcessor()
                                             val history = messages.map { com.example.backend.inference.ChatMessage(it.role, it.content) }
                                             val manifest = activeModel ?: com.example.backend.models.ModelManifest(modelId = "dummy", displayName = "Dummy", sourceUrl = "", fileName = "", chatTemplate = "fallback")
-                                            val builtPrompt = promptBuilder.buildPrompt(manifest, history, text, currentMode, currentTargetLanguage)
-                                            val responseFlow = inferenceEngine.generate(builtPrompt)
+                                            val scannedText = navController.currentBackStackEntry?.savedStateHandle?.get<String>("scanned_text") ?: ""
+                                            val routedPrompt = promptRouter.route(
+                                                mode = currentMode,
+                                                targetLanguage = currentTargetLanguage,
+                                                manifest = manifest,
+                                                history = history,
+                                                newTask = text,
+                                                ocrContext = scannedText,
+                                                retrievalContext = ""
+                                            )
+                                            val responseFlow = inferenceEngine.generate(routedPrompt.builtPrompt)
                                             var fullResponse = ""
                                             responseFlow.collect { word -> 
                                                 fullResponse += word 
-                                                streamingResponse = fullResponse
+                                                streamingResponse = postProcessor.cleanResponse(fullResponse)
                                             }
                                             chatDao.insertMessage(
-                                                ChatMessageEntity(sessionId = sId, role = "model", content = fullResponse, timestamp = System.currentTimeMillis())
+                                                ChatMessageEntity(sessionId = sId, role = "model", content = postProcessor.cleanResponse(fullResponse), timestamp = System.currentTimeMillis())
                                             )
                                         } catch (e: Exception) {
                                             chatDao.insertMessage(

@@ -10,12 +10,13 @@ class PromptBuilder : IPromptBuilder {
         val basePrompt = "You are Outcasters AI, a private local study assistant. Answer clearly, directly, and helpfully. Never mention internal runtime details, threads, context size, token counts, logs, or system internals. Adapt your answer to the selected mode. Keep the response natural, correct, and concise unless the user asks for more detail.\n\n"
         
         return basePrompt + when (mode.lowercase()) {
-            "concept" -> "Mode: Concept Learning.\nExplain simply, give step-by-step reasoning, provide examples, summarize key points, and avoid unnecessary jargon.\nOutput structure:\n- Direct Answer\n- Explanation\n- Example\n- Key Idea\n- Short Summary"
-            "language", "translate", "vocabulary", "grammar", "practice" -> "Mode: Language Learning ($targetLanguage).\nBehave like a language tutor. Respond in the selected target language when appropriate. Explain grammar clearly, give translations, provide short examples, and generate practice exercises if requested.\nOutput structure:\n- Translation\n- Explanation\n- Grammar Note\n- Example Sentence\n- Practice Prompt"
+            "concept" -> "Mode: Concept Learning.\nYou are a helpful academic tutor. Answer clearly and directly. Explain simply, give step-by-step reasoning, provide examples, summarize key points, and avoid unnecessary jargon.\nOutput structure:\n- Direct Answer\n- Explanation\n- Example\n- Key Idea\n- Short Summary"
+            "math" -> "Mode: Math/Calculus.\nYou are a math tutor. Answer only the current math or calculus question. Do not add unrelated content. If the query is ambiguous, ask for clarification. For exact math problems, solve step by step.\nOutput structure:\n- Direct Answer\n- Step-by-step solution\n- Final result\n- Short summary"
+            "language", "translate", "vocabulary", "grammar", "practice" -> "Mode: Language Learning (\$targetLanguage).\nYou are a language tutor. Teach in the selected language. Respond in the selected target language when appropriate. Explain grammar clearly, give translations, provide short examples, and generate practice exercises if requested.\nOutput structure:\n- Translation\n- Explanation\n- Grammar Note\n- Example Sentence\n- Practice Prompt"
             "interview" -> "Mode: Interview Prep.\nGive concise, structured answers. Use a professional tone, provide feedback, and avoid overly long explanations unless asked.\nOutput structure:\n- Short Answer\n- Strong Version\n- Follow-up Tip"
-            "scan_solve" -> "Mode: Scan & Solve.\nSolve the question directly. Show step-by-step logic, explain formulas or concepts, and avoid meta commentary."
+            "scan_solve" -> "Mode: Scan & Solve.\nUse OCR text only if it matches the question. Clean the OCR text first. Do not answer from stale OCR from earlier scans. Solve the question directly. Show step-by-step logic, explain formulas or concepts, and avoid meta commentary."
             "quiz" -> "Mode: Quiz.\nGenerate a short quiz based on the user's topic. Wait for their answer, then provide constructive feedback and the correct answer."
-            else -> "Mode: General Chat.\nBe conversational, helpful, and concise."
+            else -> "Mode: General Chat.\nBe conversational but stay relevant. Do not drift into unrelated topics."
         }
     }
     
@@ -28,13 +29,19 @@ class PromptBuilder : IPromptBuilder {
     ): String {
         val systemContext = getSystemContext(mode, targetLanguage)
         
+        // 1. Mode classification (handled by UI state)
+        // 2. Context cleanup & 3. Relevance filtering
+        // Filter out stale OCR text or unrelated previous conversations by only keeping the most recent exchange
+        val filteredHistory = history.takeLast(2)
+        
+        // 4. Prompt building
         return when (manifest.chatTemplate.lowercase()) {
-            "chatml" -> buildChatML(history, newTask, systemContext)
-            "llama3" -> buildLlama3(history, newTask, systemContext)
-            "phi3" -> buildPhi3(history, newTask, systemContext)
-            "gemma" -> buildGemma(history, newTask, systemContext)
-            "liquid" -> buildLiquid(history, newTask, systemContext)
-            else -> buildFallback(history, newTask, systemContext)
+            "chatml" -> buildChatML(filteredHistory, newTask, systemContext)
+            "llama3" -> buildLlama3(filteredHistory, newTask, systemContext)
+            "phi3" -> buildPhi3(filteredHistory, newTask, systemContext)
+            "gemma" -> buildGemma(filteredHistory, newTask, systemContext)
+            "liquid" -> buildLiquid(filteredHistory, newTask, systemContext)
+            else -> buildFallback(filteredHistory, newTask, systemContext)
         }
     }
 
