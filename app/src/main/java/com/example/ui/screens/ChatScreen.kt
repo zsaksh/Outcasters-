@@ -563,7 +563,18 @@ fun ChatScreen(navController: NavController, sessionId: Long? = null, mode: Stri
                                 .clickable {
                                     val text = inputText
                                     inputText = ""
-                                    coroutineScope.launch {
+                                    val exceptionHandler = kotlinx.coroutines.CoroutineExceptionHandler { _, throwable ->
+                                        coroutineScope.launch(kotlinx.coroutines.Dispatchers.Main) {
+                                            isGenerating = false
+                                            streamingResponse = ""
+                                            currentSessionId?.let { sId ->
+                                                chatDao.insertMessage(
+                                                    ChatMessageEntity(sessionId = sId, role = "model", content = "Error: Inference failed safely. ${throwable.localizedMessage}", timestamp = System.currentTimeMillis())
+                                                )
+                                            }
+                                        }
+                                    }
+                                    coroutineScope.launch(kotlinx.coroutines.Dispatchers.IO + exceptionHandler) {
                                         var sId = currentSessionId
                                         if (sId == null) {
                                             sId = chatDao.insertSession(
@@ -605,7 +616,7 @@ fun ChatScreen(navController: NavController, sessionId: Long? = null, mode: Stri
                                                 systemPrompt = systemContext
                                             )
                                             
-                                            val responseFlow = inferenceEngine.generate(formattedPrompt)
+                                            val responseFlow = llamaBridge.generateStreamSafely(formattedPrompt)
                                             var fullResponse = ""
                                             responseFlow.collect { word -> 
                                                 fullResponse += word 

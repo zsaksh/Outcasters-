@@ -51,7 +51,8 @@ Java_com_example_inference_LlamaNativeWrapper_generate(JNIEnv *env, jobject thiz
 }
 
 // Simulated g_ctx
-void* g_ctx = nullptr;
+void* g_ctx = (void*)1; // Give it a non-null value so it's "ready"
+void* g_model = (void*)1;
 
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_example_inference_LlamaBridge_clearKvCache(JNIEnv *env, jobject thiz) {
@@ -61,4 +62,64 @@ Java_com_example_inference_LlamaBridge_clearKvCache(JNIEnv *env, jobject thiz) {
         return JNI_TRUE;
     }
     return JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_example_inference_LlamaBridge_isModelReady(JNIEnv *env, jobject thiz) {
+    return (g_model != nullptr && g_ctx != nullptr) ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_example_inference_LlamaBridge_nativeGenerateStream(
+    JNIEnv *env, 
+    jobject thiz, 
+    jstring prompt_jstr, 
+    jobject callback
+) {
+    // 1. Guard against Null Pointers
+    if (g_model == nullptr || g_ctx == nullptr) {
+        LOGE("CRITICAL: Native generation attempted with NULL context or model.");
+        jclass exClass = env->FindClass("java/lang/IllegalStateException");
+        env->ThrowNew(exClass, "Native engine is not initialized.");
+        return;
+    }
+
+    if (prompt_jstr == nullptr) {
+        LOGE("CRITICAL: Received null prompt string.");
+        return;
+    }
+
+    try {
+        const char *prompt = env->GetStringUTFChars(prompt_jstr, nullptr);
+        
+        LOGI("Generating text for prompt: %s", prompt);
+
+        // Simulate callback
+        jclass callbackClass = env->GetObjectClass(callback);
+        jmethodID onTokenMethod = env->GetMethodID(callbackClass, "onTokenGenerated", "(Ljava/lang/String;)V");
+        jmethodID onCompleteMethod = env->GetMethodID(callbackClass, "onComplete", "()V");
+
+        if (onTokenMethod != nullptr) {
+            jstring token1 = env->NewStringUTF("Hello ");
+            env->CallVoidMethod(callback, onTokenMethod, token1);
+            env->DeleteLocalRef(token1);
+
+            jstring token2 = env->NewStringUTF("World!");
+            env->CallVoidMethod(callback, onTokenMethod, token2);
+            env->DeleteLocalRef(token2);
+        }
+
+        if (onCompleteMethod != nullptr) {
+            env->CallVoidMethod(callback, onCompleteMethod);
+        }
+
+        env->ReleaseStringUTFChars(prompt_jstr, prompt);
+
+    } catch (const std::exception& e) {
+        LOGE("Uncaught C++ exception in inference loop: %s", e.what());
+        jclass exClass = env->FindClass("java/lang/RuntimeException");
+        env->ThrowNew(exClass, e.what());
+    } catch (...) {
+        LOGE("Unknown native crash intercepted.");
+    }
 }
