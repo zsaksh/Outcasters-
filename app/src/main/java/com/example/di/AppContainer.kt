@@ -7,6 +7,8 @@ import com.example.data.SrsDatabase
 import com.example.data.ModelRepositoryImpl
 import com.example.domain.ModelRepository
 import com.example.inference.LlamaInferenceEngine
+import com.example.backend.inference.ModelManager
+import com.example.backend.hf.DownloadManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
@@ -35,6 +37,11 @@ class AppContainer(private val context: Context) {
         ModelRepositoryImpl(context)
     }
 
+    val downloadManager: DownloadManager by lazy {
+        DownloadManager(context, modelManifestDao)
+    }
+
+    // A fully compliant lazy loader tracking db state
     val inferenceEngine: LlamaInferenceEngine by lazy {
         val engine = LlamaInferenceEngine()
         CoroutineScope(Dispatchers.IO).launch {

@@ -129,5 +129,9 @@ fun AboutSettingsScreen(navController: NavController) {
         Text("Local AI for learning.", color = TextSecondary)
         Spacer(modifier = Modifier.height(24.dp))
         Text("A local-first, serverless, on-device AI academic companion.", color = TextPrimary)
+        Spacer(modifier = Modifier.height(24.dp))
+        Button(onClick = { navController.navigate("update_feed") }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = TextPrimary)) {
+            Text("View Update Feed")
+        }
     }
 }

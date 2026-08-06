@@ -73,7 +73,7 @@ fun ChatScreen(navController: NavController, sessionId: Long? = null) {
     val modelState by inferenceEngine.modelState.collectAsState()
     
     val allModels by db.modelManifestDao().getAllModels().collectAsState(initial = emptyList())
-    val downloadedModels = allModels.filter { it.downloadStatus == "downloaded" }
+    val downloadedModels = allModels.filter { it.installStatus == "ready" }
     val activeModel = allModels.find { it.activeStatus }
     
     var showModelBottomSheet by remember { mutableStateOf(false) }
@@ -103,7 +103,7 @@ fun ChatScreen(navController: NavController, sessionId: Long? = null) {
             TopAppBar(
                 title = { 
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                        Text(if (messages.isEmpty()) "New Chat" else "Chat", fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = TextPrimary)
+                        Text(activeModel?.displayName ?: (if (messages.isEmpty()) "New Chat" else "Chat"), fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = TextPrimary)
                         
                         // Status Pill
                         Row(verticalAlignment = Alignment.CenterVertically) {

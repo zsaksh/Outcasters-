@@ -97,6 +97,7 @@ fun OutcastersApp() {
             composable("settings/storage") { StorageSettingsScreen(navController) }
             composable("settings/ocr") { OCRSettingsScreen(navController) }
             composable("settings/about") { AboutSettingsScreen(navController) }
+            composable("update_feed") { UpdateFeedScreen(navController) }
             
             composable("scan") { ScanScreen(navController) }
             composable("chat") { ChatScreen(navController) }
@@ -107,7 +108,6 @@ fun OutcastersApp() {
             composable("interview_feedback") { InterviewFeedbackScreen(navController) }
             composable("interview_feedback_list") { InterviewFeedbackListScreen(navController) }
             composable("library") { LibraryScreen(navController) }
-            composable("model_management") { ModelManagementScreen(navController) }
             composable("chat/{sessionId}") { backStackEntry ->
                 val sessionId = backStackEntry.arguments?.getString("sessionId")?.toLongOrNull()
                 ChatScreen(navController, sessionId)
