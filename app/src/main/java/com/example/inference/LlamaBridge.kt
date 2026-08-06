@@ -9,6 +9,7 @@ interface TokenCallback {
 class LlamaBridge {
     external fun clearKvCache(): Boolean
     external fun isModelReady(): Boolean
+    external fun loadModel(modelPath: String): Boolean
     private external fun nativeGenerateStream(prompt: String, callback: TokenCallback)
 
     fun generateStreamSafely(prompt: String): kotlinx.coroutines.flow.Flow<String> = kotlinx.coroutines.flow.channelFlow {
