@@ -616,7 +616,7 @@ fun ChatScreen(navController: NavController, sessionId: Long? = null, mode: Stri
                                                 systemPrompt = systemContext
                                             )
                                             
-                                            val responseFlow = llamaBridge.generateStreamSafely(formattedPrompt)
+                                            val responseFlow = inferenceEngine.generate(formattedPrompt)
                                             var fullResponse = ""
                                             responseFlow.collect { word -> 
                                                 fullResponse += word 
