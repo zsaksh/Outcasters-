@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Outcasters</string>
+    <string name="assistant_default_name">Outcasters AI</string>
+    <string name="app_subtitle">Local AI for learning</string>
+</resources>

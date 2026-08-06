@@ -1,0 +1,6 @@
+{
+  "name": "Outcasters",
+  "description": "Local-first, serverless, on-device AI academic companion",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
