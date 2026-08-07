@@ -10,7 +10,7 @@ import com.example.inference.LlamaInferenceEngine
 class OutcastersEngineService : Service() {
 
     private val binder = LocalBinder()
-    private val engine = LlamaInferenceEngine() // We'll move the engine here or use Native bindings
+    private val engine = LlamaInferenceEngine(this) // We'll move the engine here or use Native bindings
     
     inner class LocalBinder : Binder() {
         fun getService(): OutcastersEngineService = this@OutcastersEngineService

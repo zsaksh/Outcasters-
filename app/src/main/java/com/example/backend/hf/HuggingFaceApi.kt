@@ -30,9 +30,9 @@ class HuggingFaceApi {
 
     suspend fun searchGGUFModels(query: String = ""): List<HFModelInfo> = withContext(Dispatchers.IO) {
         val url = if (query.isNotBlank()) {
-            "https://huggingface.co/api/models?search=$query&filter=gguf,text-generation&sort=downloads&direction=-1&limit=20"
+            "https://huggingface.co/api/models?search=$query&filter=bin,text-generation&sort=downloads&direction=-1&limit=20"
         } else {
-            "https://huggingface.co/api/models?filter=gguf,text-generation&sort=downloads&direction=-1&limit=20"
+            "https://huggingface.co/api/models?filter=bin,text-generation&sort=downloads&direction=-1&limit=20"
         }
         
         val request = Request.Builder().url(url).build()
@@ -80,7 +80,7 @@ class HuggingFaceApi {
                         val type = obj.optString("type")
                         val path = obj.optString("path")
                         
-                        if (type == "file" && path.endsWith(".gguf", ignoreCase = true)) {
+                        if (type == "file" && path.endsWith(".bin", ignoreCase = true)) {
                             files.add(
                                 HFFileInfo(
                                     path = path,

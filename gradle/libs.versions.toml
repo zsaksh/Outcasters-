@@ -24,6 +24,7 @@ firebaseBom = "33.8.0"
 googleServices = "4.5.0"
 mlkitTextRecognition = "16.0.0"
 secretsGradlePlugin = "2.0.1"
+mediapipeGenAi = "0.10.14"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -53,6 +54,7 @@ moshi-kotlin-codegen = { group = "com.squareup.moshi", name = "moshi-kotlin-code
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
 logging-interceptor = { group = "com.squareup.okhttp3", name = "logging-interceptor", version.ref = "okhttp" }
 mlkit-text-recognition = { group = "com.google.mlkit", name = "text-recognition", version.ref = "mlkitTextRecognition" }
+mediapipe-tasks-genai = { group = "com.google.mediapipe", name = "tasks-genai", version.ref = "mediapipeGenAi" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

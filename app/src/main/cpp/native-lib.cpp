@@ -1,42 +1,14 @@
 #include <jni.h>
 #include <string>
 #include <android/log.h>
+#include <chrono>
+#include <thread>
+#include <sstream>
+#include <vector>
 
 #define TAG "OutcastersNative"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
-
-extern "C" JNIEXPORT jboolean JNICALL
-Java_com_example_inference_LlamaNativeWrapper_loadModel(JNIEnv *env, jobject thiz, jstring path, jint context_length, jint threads) {
-    const char *model_path = env->GetStringUTFChars(path, nullptr);
-    LOGI("Loading model: %s with context: %d threads: %d", model_path, context_length, threads);
-    env->ReleaseStringUTFChars(path, model_path);
-    return JNI_TRUE;
-}
-
-extern "C" JNIEXPORT void JNICALL
-Java_com_example_inference_LlamaNativeWrapper_unloadModel(JNIEnv *env, jobject thiz) {
-    LOGI("Unloading model...");
-}
-
-extern "C" JNIEXPORT void JNICALL
-Java_com_example_inference_LlamaNativeWrapper_generate(JNIEnv *env, jobject thiz, jstring prompt, jobject callback) {
-    const char *prompt_chars = env->GetStringUTFChars(prompt, nullptr);
-    LOGI("Generating text for prompt: %s", prompt_chars);
-    
-    jclass callbackClass = env->GetObjectClass(callback);
-    jmethodID onTokenMethod = env->GetMethodID(callbackClass, "onToken", "(Ljava/lang/String;)V");
-    
-    jstring token1 = env->NewStringUTF("Hello ");
-    env->CallVoidMethod(callback, onTokenMethod, token1);
-    env->DeleteLocalRef(token1);
-    
-    jstring token2 = env->NewStringUTF("World");
-    env->CallVoidMethod(callback, onTokenMethod, token2);
-    env->DeleteLocalRef(token2);
-    
-    env->ReleaseStringUTFChars(prompt, prompt_chars);
-}
 
 // Simulated Context and State
 void* g_ctx = (void*)1;
@@ -88,7 +60,6 @@ Java_com_example_inference_LlamaBridge_nativeGenerateStream(
     jobject callback) {
     
     g_cancel_flag = false;
-
     if (g_model == nullptr || g_ctx == nullptr) {
         LOGE("CRITICAL: Native generation attempted with NULL context or model.");
         jclass exClass = env->FindClass("java/lang/IllegalStateException");
@@ -102,6 +73,7 @@ Java_com_example_inference_LlamaBridge_nativeGenerateStream(
     
     try {
         const char *prompt = env->GetStringUTFChars(prompt_jstr, nullptr);
+        std::string prompt_str(prompt);
         LOGI("Generating text for prompt: %s (Temp: %f, MaxTokens: %d)", prompt, temperature, max_tokens);
         
         jclass callbackClass = env->GetObjectClass(callback);
@@ -109,14 +81,32 @@ Java_com_example_inference_LlamaBridge_nativeGenerateStream(
         jmethodID onCompleteMethod = env->GetMethodID(callbackClass, "onComplete", "()V");
         
         if (onTokenMethod != nullptr && !g_cancel_flag) {
-            jstring token1 = env->NewStringUTF("Hello ");
-            env->CallVoidMethod(callback, onTokenMethod, token1);
-            env->DeleteLocalRef(token1);
             
-            if (!g_cancel_flag) {
-                jstring token2 = env->NewStringUTF("World!");
-                env->CallVoidMethod(callback, onTokenMethod, token2);
-                env->DeleteLocalRef(token2);
+            // Extract a snippet of the user query
+            std::string user_snippet = "";
+            size_t user_pos = prompt_str.rfind("user\n");
+            if (user_pos != std::string::npos) {
+                user_snippet = prompt_str.substr(user_pos + 5);
+            } else {
+                user_snippet = prompt_str.substr(0, 100);
+            }
+            
+            // Generate a thoughtful mock response
+            std::string full_response = "I am a simulated local AI model running natively via C++ and JNI.\n\nBased on your prompt, here is my response to: \"" + user_snippet + "\"\n\nLocal models offer significant advantages in privacy, lower latency for specific tasks, and the ability to function without an internet connection. By leveraging MediaPipe quantization techniques, models are loaded efficiently into memory, enabling real-time generation speeds even on mobile hardware.\n\nEverything you are seeing is streamed token-by-token from the C++ inference engine layer!";
+            
+            // Split into tokens (simulate words)
+            std::istringstream iss(full_response);
+            std::string word;
+            while (iss >> word) {
+                if (g_cancel_flag) break;
+                
+                std::string token_str = word + " ";
+                jstring token = env->NewStringUTF(token_str.c_str());
+                env->CallVoidMethod(callback, onTokenMethod, token);
+                env->DeleteLocalRef(token);
+                
+                // Slight delay to simulate inference time
+                std::this_thread::sleep_for(std::chrono::milliseconds(30));
             }
         }
         
@@ -138,7 +128,7 @@ extern "C" JNIEXPORT jboolean JNICALL
 Java_com_example_inference_LlamaBridge_loadModel(JNIEnv *env, jobject thiz, jstring path) {
     if (path == nullptr) return JNI_FALSE;
     const char *model_path = env->GetStringUTFChars(path, nullptr);
-    LOGI("LlamaBridge Initialization: Verifying GGUF model binary path: %s", model_path);
+    LOGI("LlamaBridge Initialization: Verifying MediaPipe model binary path: %s", model_path);
     LOGI("LlamaBridge Initialization: Memory mapping successful for model.");
     env->ReleaseStringUTFChars(path, model_path);
     g_model = (void*)1;

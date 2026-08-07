@@ -9,7 +9,7 @@ data class ModelManifest(
     val displayName: String,
     val sourceUrl: String,
     val fileName: String,
-    val format: String = "GGUF",
+    val format: String = "TFLITE",
     val quantization: String = "",
     val checksum: String = "",
     val fileSizeBytes: Long = 0L,

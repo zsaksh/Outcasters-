@@ -15,7 +15,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ModelManifestEntity::class,
         InferenceMetadataEntity::class
     ], 
-    version = 4, 
+    version = 5, 
     exportSchema = false
 )
 @TypeConverters(Converters::class)

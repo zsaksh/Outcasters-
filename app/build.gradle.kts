@@ -2,6 +2,7 @@ plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.compose)
   alias(libs.plugins.google.devtools.ksp)
+   
 }
 
 android {
@@ -28,6 +29,7 @@ android {
   }
   buildFeatures {
     compose = true
+     
   }
   externalNativeBuild {
     cmake {
@@ -60,6 +62,7 @@ dependencies {
   implementation(libs.androidx.lifecycle.runtime.ktx)
   implementation(libs.androidx.navigation.compose)
   implementation(libs.mlkit.text.recognition)
+  implementation(libs.mediapipe.tasks.genai)
   implementation(libs.androidx.room.runtime)
   implementation(libs.androidx.room.ktx)
   ksp(libs.androidx.room.compiler)

@@ -41,7 +41,7 @@ class HuggingFaceRepository(private val context: Context, private val client: Ok
                         val path = item.optString("path")
                         val size = item.optLong("size", 0L)
                         
-                        if (type == "file" && path.endsWith(".gguf", ignoreCase = true)) {
+                        if (type == "file" && path.endsWith(".tflite", ignoreCase = true)) {
                             // Extract quantization from filename (heuristic)
                             val quant = extractQuantization(path)
                             val downloadUrl = "https://huggingface.co/\$repoId/resolve/main/\$path"

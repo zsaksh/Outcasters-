@@ -1,311 +1,87 @@
-@file:Suppress("OPT_IN_USAGE", "OPT_IN_USAGE_ERROR")
 package com.example.ui.screens
 
-
-
-
-import androidx.compose.animation.core.animateFloat
-
-
-
-
-import androidx.compose.animation.core.infiniteRepeatable
-
-
-
-
-import androidx.compose.animation.core.rememberInfiniteTransition
-
-
-
-
-import androidx.compose.animation.core.tween
-
-
-
-
-import androidx.compose.animation.core.LinearEasing
-
-
-
-
-import androidx.compose.animation.core.RepeatMode
-
-
-
-
-
-
-import android.content.Intent
-
-
-
-
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
-
-
-
-
 import androidx.compose.foundation.clickable
-
-
-
-
 import androidx.compose.foundation.layout.*
-
-
-
-
 import androidx.compose.foundation.lazy.LazyColumn
-
-
-
-
 import androidx.compose.foundation.lazy.items
-
-
-
-
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-
-
-
-
 import androidx.compose.foundation.shape.RoundedCornerShape
-
-
-
-
 import androidx.compose.material.icons.Icons
-
-
-
-
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-
-
-
-
 import androidx.compose.material.icons.automirrored.filled.Send
-
-
-
-
 import androidx.compose.material.icons.filled.Add
-
-
-
-
-import androidx.compose.material.icons.filled.ArrowDropDown
-
-
-
-
-import androidx.compose.material.icons.filled.CameraAlt
-
-
-
-
-import androidx.compose.material.icons.filled.Mic
-
-
-
-
-import androidx.compose.material.icons.filled.Psychology
-
-
-
-
 import androidx.compose.material.icons.filled.MoreVert
-
-
-
-
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
-
-
-
-
 import androidx.compose.runtime.*
-
-
-
-
 import androidx.compose.ui.Alignment
-
-
-
-
 import androidx.compose.ui.Modifier
-
-
-
-
 import androidx.compose.ui.draw.clip
-
-
-
-
 import androidx.compose.ui.graphics.Color
-
-
-
-
 import androidx.compose.ui.platform.LocalContext
-
-
-
-
 import androidx.compose.ui.text.font.FontWeight
-
-
-
-
-
-import androidx.compose.ui.text.AnnotatedString
-
-
-
-
-import androidx.compose.ui.text.SpanStyle
-
-
-
-
-import androidx.compose.ui.text.buildAnnotatedString
-
-
-
-
-import androidx.compose.ui.text.withStyle
-
-
-
-
-
 import androidx.compose.ui.unit.dp
-
-
-
-
 import androidx.compose.ui.unit.sp
-
-
-
-
 import androidx.navigation.NavController
-
-
-
-
-import com.example.OutcastersApplication
-
-
-
-
-import com.example.backend.device.BatteryStateReceiver
-
-
-
-
+import com.example.backend.models.ModelManifest
 import com.example.data.ChatMessageEntity
-
-
-
-
-import com.example.data.ChatSessionEntity
-
-
-
-
-import com.example.data.SrsDatabase
-
-
-
-
 import com.example.ui.theme.*
-
-
-
-
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
-
-
-fun parseMarkdown(text: String): AnnotatedString {
-    return buildAnnotatedString {
-        val parts = text.split("**")
-        var isBold = false
-        for (part in parts) {
-            if (isBold) {
-                withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
-                    append(part)
-                }
-            } else {
-                append(part)
-            }
-            isBold = !isBold
-        }
-    }
-}
-
-
-
-
 @Composable
-
-fun ChatScreen(navController: NavController, sessionId: Long? = null, mode: String = "chat", targetLanguage: String = "French") {
+fun ChatScreen(navController: NavController, sessionId: Long?, mode: String, targetLanguage: String) {
     val context = LocalContext.current
-    val app = context.applicationContext as OutcastersApplication
+    val app = context.applicationContext as com.example.OutcastersApplication
     val chatDao = app.container.chatDao
     val inferenceEngine = app.container.inferenceEngine
-    val db = remember { androidx.room.Room.databaseBuilder(context, SrsDatabase::class.java, "srs_db").fallbackToDestructiveMigration().build() }
+    val modelManifestDao = app.container.modelManifestDao
+    val allModels by modelManifestDao.getAllModels().collectAsState(initial = emptyList())
+    val activeModel = allModels.find { it.activeStatus }
+
     
     val coroutineScope = rememberCoroutineScope()
-    var currentSessionId by remember { mutableStateOf(sessionId) }
+    val listState = rememberLazyListState()
+
+    var currentSessionId by remember { mutableStateOf<Long?>(if (sessionId == -1L) null else sessionId) }
     var messages by remember { mutableStateOf<List<ChatMessageEntity>>(emptyList()) }
     var inputText by remember { mutableStateOf("") }
     var currentMode by remember { mutableStateOf(mode) }
     var currentTargetLanguage by remember { mutableStateOf(targetLanguage) }
     var isGenerating by remember { mutableStateOf(false) }
     var streamingResponse by remember { mutableStateOf("") }
-    
+
     val savedStateHandle = navController.currentBackStackEntry?.savedStateHandle
     val scannedTextState = savedStateHandle?.getStateFlow("scanned_text", "")?.collectAsState()
     val scannedText = scannedTextState?.value ?: ""
-    
+
     LaunchedEffect(scannedText) {
         if (scannedText.isNotBlank()) {
             inputText += (if (inputText.isEmpty()) "" else "\n") + scannedText
             savedStateHandle?.remove<String>("scanned_text")
         }
     }
-    
-    val modelState by inferenceEngine.modelState.collectAsState()
-    
-    val allModels by db.modelManifestDao().getAllModels().collectAsState(initial = emptyList())
-    val downloadedModels = allModels.filter { it.installStatus == "ready" }
-    val activeModel = allModels.find { it.activeStatus }
-    
-    var showModelBottomSheet by remember { mutableStateOf(false) }
-    var isLowPowerMode by remember { mutableStateOf(false) }
-    
-    val batteryReceiver = remember { BatteryStateReceiver(context) }
-    val batteryPct by batteryReceiver.batteryLevel.collectAsState()
-    val recommendLowPower by batteryReceiver.isLowPowerModeRecommended.collectAsState()
-    
-    DisposableEffect(Unit) {
-        batteryReceiver.register()
-        onDispose {
-            batteryReceiver.unregister()
+
+    LaunchedEffect(currentSessionId) {
+        currentSessionId?.let { sId ->
+            chatDao.getMessagesForSession(sId).collectLatest { msgs ->
+                messages = msgs
+                if (msgs.isNotEmpty()) {
+                    listState.animateScrollToItem(msgs.size - 1)
+                }
+            }
         }
     }
-    
-    LaunchedEffect(currentSessionId) {
-        currentSessionId?.let { id ->
-            chatDao.getMessagesForSession(id).collect {
-                messages = it
+
+    LaunchedEffect(messages.size, streamingResponse) {
+        if (messages.isNotEmpty() || streamingResponse.isNotEmpty()) {
+            val target = messages.size + (if (isGenerating) 1 else 0)
+            if (target > 0) {
+                listState.scrollToItem(target - 1)
             }
         }
     }
@@ -313,169 +89,80 @@ fun ChatScreen(navController: NavController, sessionId: Long? = null, mode: Stri
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { 
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                        Text(activeModel?.displayName ?: (if (messages.isEmpty()) "New Chat" else "Chat"), fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = TextPrimary)
-                        
-                        // Status Pill
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(8.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        when (modelState) {
-                                            is com.example.backend.models.ModelState.Active -> AccentTeal
-                                            is com.example.backend.models.ModelState.Loading -> AccentPurple
-                                            is com.example.backend.models.ModelState.NotInstalled -> Color.Red
-                                            else -> Color.Gray
-                                        }
-                                    )
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = when (modelState) {
-                                    is com.example.backend.models.ModelState.Active -> "Ready \uD83DFE2" //🟢
-                                    is com.example.backend.models.ModelState.Loading -> "Loading \uD83DFE1" //🟡
-                                    is com.example.backend.models.ModelState.NotInstalled -> "Offline \u26AA" //⚪
-                                    else -> "Download Required \uD83DFE1" //🔴
-                                },
-                                fontSize = 12.sp, color = TextSecondary
-                            )
-                        }
+                title = {
+                    Column {
+                        Text(
+                            text = currentMode.replaceFirstChar { it.uppercase() },
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
+                        val modelName = activeModel?.displayName ?: "No Model"
+                        Text(
+                            text = "via $modelName",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary
+                        )
                     }
                 },
                 navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
+                    IconButton(onClick = { navController.navigateUp() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = TextPrimary)
                     }
                 },
                 actions = {
-                    IconButton(onClick = { showModelBottomSheet = true }) {
-                        Icon(Icons.Filled.MoreVert, contentDescription = "More", tint = TextPrimary)
+                    IconButton(onClick = { /* TODO: Session options */ }) {
+                        Icon(Icons.Filled.MoreVert, contentDescription = "Options", tint = TextPrimary)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    titleContentColor = TextPrimary
-                )
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = BgDark)
             )
         },
-        containerColor = MaterialTheme.colorScheme.background
-    ) { paddingValues ->
+        containerColor = BgDark
+    ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
+                .padding(padding)
         ) {
-
-            if (currentMode == "language" || currentMode == "translate" || currentMode == "vocabulary" || currentMode == "grammar" || currentMode == "practice") {
-                val languages = listOf("French", "Spanish", "Japanese", "German", "Mandarin")
-                var expanded by remember { mutableStateOf(false) }
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Language Mode:", fontWeight = FontWeight.SemiBold, color = TextPrimary)
-                    Box {
-                        TextButton(onClick = { expanded = true }) {
-                            Text(currentTargetLanguage)
-                            Icon(Icons.Filled.ArrowDropDown, contentDescription = "Select Language")
-                        }
-                        DropdownMenu(
-                            expanded = expanded,
-                            onDismissRequest = { expanded = false }
-                        ) {
-                            languages.forEach { lang ->
-                                DropdownMenuItem(
-                                    text = { Text(lang) },
-                                    onClick = {
-                                        currentTargetLanguage = lang
-                                        expanded = false
-                                    }
-                                )
-                            }
-                        }
+            // Status banner for offline/model state
+            if (activeModel == null) {
+                Surface(color = MaterialTheme.colorScheme.errorContainer, modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier.padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(Icons.Filled.Warning, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("No active model. Go to Models to download one.", style = MaterialTheme.typography.labelMedium)
                     }
                 }
-                
-                // Tasks row
-                val langTasks = listOf("Translate", "Vocabulary", "Grammar", "Practice")
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    langTasks.forEach { task ->
-                        val isSelected = currentMode == task.lowercase() || (currentMode == "language" && task == "Practice")
-                        FilterChip(
-                            selected = isSelected,
-                            onClick = { currentMode = task.lowercase() },
-                            label = { Text(task) }
-                        )
-                    }
-                }
-                HorizontalDivider()
             }
 
             LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                reverseLayout = false
+                contentPadding = PaddingValues(vertical = 16.dp)
             ) {
-                if (messages.isEmpty()) {
+                if (messages.isEmpty() && !isGenerating) {
                     item {
                         Box(modifier = Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
-                            when (modelState) {
-                                is com.example.backend.models.ModelState.Loading -> {
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        ThinkingAnimation()
-                                        Spacer(modifier = Modifier.height(16.dp))
-                                        Text("Warming up local model...", color = TextSecondary, fontSize = 14.sp)
-                                    }
-                                }
-                                is com.example.backend.models.ModelState.NotInstalled -> {
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(64.dp)
-                                                .background(AccentTeal.copy(alpha = 0.15f), CircleShape),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Icon(Icons.Filled.Psychology, "AI", tint = AccentTeal, modifier = Modifier.size(32.dp))
-                                        }
-                                        Spacer(modifier = Modifier.height(16.dp))
-                                        Text("No Active Model", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = TextPrimary)
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        Text("You need to activate a local model\nbefore starting a conversation.", fontSize = 14.sp, color = TextSecondary, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-                                        Spacer(modifier = Modifier.height(24.dp))
-                                        Button(
-                                            onClick = { navController.navigate("models") },
-                                            colors = ButtonDefaults.buttonColors(containerColor = AccentTeal)
-                                        ) {
-                                            Text("Go to Model Hub")
-                                        }
-                                    }
-                                }
-                                else -> {
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(64.dp)
-                                                .background(AccentTeal.copy(alpha = 0.15f), CircleShape),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Icon(Icons.Filled.Psychology, "AI", tint = AccentTeal, modifier = Modifier.size(32.dp))
-                                        }
-                                        Spacer(modifier = Modifier.height(16.dp))
-                                        Text("No conversations yet", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = TextPrimary)
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        Text("Start a new chat or scan\na question to begin.", fontSize = 14.sp, color = TextSecondary, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-                                    }
-                                }
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = "Start a conversation",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = TextSecondary
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "Mode: ${currentMode.replaceFirstChar { it.uppercase() }}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = TextSecondary
+                                )
                             }
                         }
                     }
@@ -502,59 +189,44 @@ fun ChatScreen(navController: NavController, sessionId: Long? = null, mode: Stri
                     item { Spacer(modifier = Modifier.height(8.dp)) }
                 }
             }
-            
-            // Input Bar
+
+            // Input Area
             Surface(
-                color = MaterialTheme.colorScheme.background,
-                modifier = Modifier.fillMaxWidth()
+                color = SurfaceDark,
+                shadowElevation = 8.dp,
+                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .navigationBarsPadding(),
+                    verticalAlignment = Alignment.Bottom
                 ) {
-                    val isActive = modelState is com.example.backend.models.ModelState.Active
-                    TextField(
+                    IconButton(
+                        onClick = { navController.navigate("ocr_scanner") },
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    ) {
+                        Icon(Icons.Filled.Add, contentDescription = "Attach", tint = TextSecondary)
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    OutlinedTextField(
                         value = inputText,
-                        onValueChange = { if (isActive) inputText = it },
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(24.dp)),
-                        placeholder = { 
-                            Text(
-                                text = when (modelState) {
-                                    is com.example.backend.models.ModelState.Loading -> "Loading your local model..."
-                                    is com.example.backend.models.ModelState.NotInstalled -> "Choose a model to start chatting"
-                                    else -> "Ask a question..."
-                                },
-                                color = TextSecondary 
-                            ) 
-                        },
-                        enabled = isActive,
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent,
-                            disabledIndicatorColor = Color.Transparent,
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary,
-                            disabledTextColor = TextSecondary
+                        onValueChange = { inputText = it },
+                        modifier = Modifier.weight(1f),
+                        placeholder = { Text("Ask something...", color = TextSecondary) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = AccentTeal,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                            focusedContainerColor = MaterialTheme.colorScheme.surface,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surface
                         ),
-                        trailingIcon = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Filled.Mic, "Mic", tint = if (isActive) TextSecondary else TextSecondary.copy(alpha = 0.5f), modifier = Modifier.size(20.dp).clickable(enabled = isActive) { })
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Icon(Icons.Filled.CameraAlt, "Scan", tint = if (isActive) TextSecondary else TextSecondary.copy(alpha = 0.5f), modifier = Modifier.size(20.dp).clickable(enabled = isActive) { navController.navigate("scan") })
-                                Spacer(modifier = Modifier.width(16.dp))
-                            }
-                        }
+                        shape = RoundedCornerShape(24.dp),
+                        maxLines = 5
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     
-                    if (inputText.isNotBlank() && isActive) {
+                    if (inputText.isNotBlank()) {
                         Box(
                             modifier = Modifier
                                 .size(48.dp)
@@ -578,8 +250,8 @@ fun ChatScreen(navController: NavController, sessionId: Long? = null, mode: Stri
                                         var sId = currentSessionId
                                         if (sId == null) {
                                             sId = chatDao.insertSession(
-                                                ChatSessionEntity(
-                                                    title = text.take(20) + "...",
+                                                com.example.data.ChatSessionEntity(
+                                                    title = if (text.length > 20) text.take(20) + "..." else text,
                                                     timestamp = System.currentTimeMillis()
                                                 )
                                             )
@@ -597,50 +269,35 @@ fun ChatScreen(navController: NavController, sessionId: Long? = null, mode: Stri
                                             val postProcessor = com.example.backend.inference.PostProcessor()
                                             val history = messages.map { com.example.backend.inference.ChatMessage(role = it.role, content = it.content, mode = currentMode, model = activeModel?.modelId ?: "", language = currentTargetLanguage) }
                                             val manifest = activeModel ?: com.example.backend.models.ModelManifest(modelId = "dummy", displayName = "Dummy", sourceUrl = "", fileName = "", chatTemplate = "fallback")
-                                            val scannedText = navController.currentBackStackEntry?.savedStateHandle?.get<String>("scanned_text") ?: ""
+                                            val scannedTextFromState = navController.currentBackStackEntry?.savedStateHandle?.get<String>("scanned_text") ?: ""
                                             val routedPrompt = promptRouter.route(
                                                 mode = currentMode,
                                                 targetLanguage = currentTargetLanguage,
                                                 manifest = manifest,
                                                 history = history,
                                                 newTask = text,
-                                                ocrContext = scannedText,
+                                                ocrContext = scannedTextFromState,
                                                 retrievalContext = ""
                                             )
-                                            val llamaBridge = com.example.inference.LlamaBridge()
                                             
-                                            var retryCount = 0
-                                            var initSuccess = false
-                                            while (retryCount < 3 && !initSuccess) {
-                                                try {
-                                                    if (!llamaBridge.isModelReady()) {
-                                                        val path = activeModel?.fileName ?: "default.gguf"
-                                                        llamaBridge.loadModel(path)
-                                                    }
-                                                    initSuccess = llamaBridge.isModelReady()
-                                                } catch (e: Exception) {
-                                                    // Catch null pointer or initialization errors and retry
-                                                }
-                                                if (!initSuccess) {
-                                                    retryCount++
-                                                    kotlinx.coroutines.delay(100)
-                                                }
-                                            }
-                                            
-                                            if (!initSuccess) {
-                                                throw IllegalStateException("Failed to initialize C++ inference engine after retries.")
-                                            }
-                                            
-                                            llamaBridge.clearKvCache()
-                                            
+                                            // Initialize engine if needed (we rely on it being loaded globally)
                                             val responseFlow = inferenceEngine.generate(routedPrompt.builtPrompt, routedPrompt.config)
                                             var fullResponse = ""
-                                            responseFlow.collect { word -> 
-                                                fullResponse += word 
-                                                streamingResponse = postProcessor.cleanResponse(fullResponse)
+                                            var lastUpdateTime = System.currentTimeMillis()
+                                            
+                                            responseFlow.collect { chunk -> 
+                                                fullResponse += chunk 
+                                                // Throttle UI updates to roughly every 50ms to reduce perceived latency and main thread locking
+                                                val now = System.currentTimeMillis()
+                                                if (now - lastUpdateTime > 50) {
+                                                    streamingResponse = postProcessor.cleanResponse(fullResponse)
+                                                    lastUpdateTime = now
+                                                }
                                             }
+                                            // Final flush
+                                            val finalCleaned = postProcessor.cleanResponse(fullResponse)
                                             chatDao.insertMessage(
-                                                ChatMessageEntity(sessionId = sId, role = "model", content = postProcessor.cleanResponse(fullResponse), timestamp = System.currentTimeMillis())
+                                                ChatMessageEntity(sessionId = sId, role = "model", content = finalCleaned, timestamp = System.currentTimeMillis())
                                             )
                                         } catch (e: Exception) {
                                             chatDao.insertMessage(
@@ -671,175 +328,93 @@ fun ChatScreen(navController: NavController, sessionId: Long? = null, mode: Stri
                 }
             }
         }
-        
-        if (showModelBottomSheet) {
-            ModalBottomSheet(onDismissRequest = { showModelBottomSheet = false }) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Select Model", style = MaterialTheme.typography.titleLarge)
-                    Spacer(modifier = Modifier.height(16.dp))
-                    
-                    if (downloadedModels.isEmpty()) {
-                        Text("No models downloaded.", color = TextSecondary)
-                    } else {
-                        downloadedModels.forEach { model ->
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        coroutineScope.launch {
-                                            db.modelManifestDao().setActiveModelAtomic(model.modelId)
-                                            showModelBottomSheet = false
-                                        }
-                                    }
-                                    .padding(vertical = 12.dp)
-                            ) {
-                                RadioButton(
-                                    selected = model.activeStatus,
-                                    onClick = { 
-                                        coroutineScope.launch {
-                                            db.modelManifestDao().setActiveModelAtomic(model.modelId)
-                                            showModelBottomSheet = false
-                                        }
-                                    }
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(model.displayName, fontSize = 16.sp, color = TextPrimary)
-                            }
-                        }
-                    }
-                    
-                    Spacer(modifier = Modifier.height(24.dp))
-                    HorizontalDivider()
-                    Spacer(modifier = Modifier.height(16.dp))
-                    
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text("Low Power Mode", fontSize = 16.sp, fontWeight = FontWeight.Medium, color = TextPrimary)
-                            Text("Reduces context window size to save energy.", fontSize = 12.sp, color = TextSecondary)
-                            if (recommendLowPower) {
-                                Text("Recommended (Battery at $batteryPct%)", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
-                            }
-                        }
-                        Switch(checked = isLowPowerMode, onCheckedChange = { 
-                            isLowPowerMode = it
-                            inferenceEngine.contextWindow = if (it) 1024 else 4096
-                        })
-                    }
-                    
-                    Spacer(modifier = Modifier.height(32.dp))
-                }
-            }
-        }
     }
 }
 
-
-
-
 @Composable
-
 fun ChatBubble(message: ChatMessageEntity) {
     val isUser = message.role == "user"
-    
-    if (isUser) {
-        Box(
-            modifier = Modifier.fillMaxWidth().padding(start = 48.dp, top = 8.dp, bottom = 8.dp),
-            contentAlignment = Alignment.CenterEnd
-        ) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start
+    ) {
+        if (!isUser) {
             Box(
                 modifier = Modifier
-                    .clip(
-                        RoundedCornerShape(
-                            topStart = 24.dp,
-                            topEnd = 24.dp,
-                            bottomStart = 24.dp,
-                            bottomEnd = 4.dp
-                        )
-                    )
-                    .background(BubbleUser)
-                    .padding(horizontal = 20.dp, vertical = 14.dp)
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(AccentPurple),
+                contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = message.content,
-                    fontSize = 15.sp,
-                    lineHeight = 22.sp,
-                    color = Color.Black
-                )
+                Text("AI", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
+            Spacer(modifier = Modifier.width(8.dp))
         }
-    } else {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(end = 24.dp, top = 16.dp, bottom = 16.dp)
+        
+        Surface(
+            color = if (isUser) AccentTeal else SurfaceDark,
+            shape = RoundedCornerShape(
+                topStart = 16.dp,
+                topEnd = 16.dp,
+                bottomStart = if (isUser) 16.dp else 4.dp,
+                bottomEnd = if (isUser) 4.dp else 16.dp
+            ),
+            shadowElevation = if (isUser) 0.dp else 2.dp,
+            modifier = Modifier.widthIn(max = 280.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    Icons.Filled.Psychology,
-                    contentDescription = "AI",
-                    tint = AccentTeal,
-                    modifier = Modifier.size(24.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    "Outcasters AI",
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 14.sp,
-                    color = AccentTeal
-                )
-            }
-            Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = message.content,
-                fontSize = 16.sp,
-                lineHeight = 26.sp,
-                fontFamily = androidx.compose.ui.text.font.FontFamily.Serif,
-                color = TextPrimary
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                color = if (isUser) Color.White else TextPrimary,
+                style = MaterialTheme.typography.bodyLarge
             )
+        }
+        
+        if (isUser) {
+            Spacer(modifier = Modifier.width(8.dp))
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.secondary),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("U", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            }
         }
     }
 }
 
-
-
-
 @Composable
-
 fun ThinkingAnimation() {
-    val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "thinking")
-    val alpha by infiniteTransition.animateFloat(
-        initialValue = 0.3f,
-        targetValue = 1f,
-        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
-            animation = androidx.compose.animation.core.tween(800, easing = androidx.compose.animation.core.LinearEasing),
-            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
-        ),
-        label = "alpha"
-    )
-
     Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.padding(start = 24.dp, top = 8.dp, bottom = 16.dp)
+        modifier = Modifier.padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            Icons.Filled.Psychology,
-            contentDescription = "AI Thinking",
-            tint = AccentTeal.copy(alpha = alpha),
-            modifier = Modifier.size(24.dp)
+        val infiniteTransition = rememberInfiniteTransition()
+        val alpha by infiniteTransition.animateFloat(
+            initialValue = 0.2f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(800, easing = LinearEasing),
+                repeatMode = RepeatMode.Reverse
+            )
         )
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            "Outcasters AI is thinking...",
-            color = AccentTeal.copy(alpha = alpha),
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold
-        )
+        Box(modifier = Modifier
+            .size(8.dp)
+            .clip(CircleShape)
+            .background(AccentPurple.copy(alpha = alpha)))
+        Spacer(modifier = Modifier.width(4.dp))
+        Box(modifier = Modifier
+            .size(8.dp)
+            .clip(CircleShape)
+            .background(AccentPurple.copy(alpha = alpha)))
+        Spacer(modifier = Modifier.width(4.dp))
+        Box(modifier = Modifier
+            .size(8.dp)
+            .clip(CircleShape)
+            .background(AccentPurple.copy(alpha = alpha)))
     }
 }
-
-

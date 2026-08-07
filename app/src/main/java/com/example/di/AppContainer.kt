@@ -19,7 +19,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 class AppContainer(private val context: Context) {
     val database by lazy {
         Room.databaseBuilder(context, AppDatabase::class.java, "outcasters_db")
-            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4)
+            .fallbackToDestructiveMigration()
             .build()
     }
     
@@ -51,7 +51,7 @@ class AppContainer(private val context: Context) {
 
     // A fully compliant lazy loader tracking db state
     val inferenceEngine: LlamaInferenceEngine by lazy {
-        val engine = LlamaInferenceEngine()
+        val engine = LlamaInferenceEngine(context)
         CoroutineScope(Dispatchers.IO).launch {
             modelManifestDao.getAllModels()
                 .map { models -> models.find { it.activeStatus }?.fileName }

@@ -30,7 +30,6 @@ fun OutcastersApp() {
     
     val items = listOf(
         "home" to "Home",
-        "learn" to "Learn",
         "models" to "Models",
         "settings" to "Settings"
     )
@@ -52,7 +51,6 @@ fun OutcastersApp() {
                             icon = {
                                 when (route) {
                                     "home" -> Icon(Icons.Filled.Home, contentDescription = label)
-                                    "learn" -> Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = label)
                                     "models" -> Icon(Icons.Filled.Storage, contentDescription = label)
                                     "settings" -> Icon(Icons.Filled.Settings, contentDescription = label)
                                 }
@@ -89,7 +87,6 @@ fun OutcastersApp() {
             popExitTransition = { fadeOut(animationSpec = tween(300)) }
         ) {
             composable("home") { HomeScreen(navController) }
-            composable("learn") { LearnScreen(navController) }
             composable("models") { com.example.ui.screens.ModelHubScreen(navController) }
             composable("settings") { SettingsScreen(navController) }
             composable("settings/behavior") { BehaviorSettingsScreen(navController) }
@@ -107,20 +104,14 @@ fun OutcastersApp() {
                 "chat?mode={mode}&lang={lang}",
                 arguments = listOf(
                     navArgument("mode") { defaultValue = "chat" },
-                    navArgument("lang") { defaultValue = "French" }
+                    navArgument("lang") { defaultValue = "English" }
                 )
             ) { backStackEntry ->
                 val mode = backStackEntry.arguments?.getString("mode") ?: "chat"
-                val lang = backStackEntry.arguments?.getString("lang") ?: "French"
+                val lang = backStackEntry.arguments?.getString("lang") ?: "English"
                 ChatScreen(navController, null, mode, lang)
             }
             
-            composable("immersion_talk") { ImmersionTalkScreen(navController) }
-            composable("debrief") { DebriefScreen(navController) }
-            composable("mock_interview_setup") { MockInterviewSetupScreen(navController) }
-            composable("live_mock_interview") { LiveMockInterviewScreen(navController) }
-            composable("interview_feedback") { InterviewFeedbackScreen(navController) }
-            composable("interview_feedback_list") { InterviewFeedbackListScreen(navController) }
             composable("library") { LibraryScreen(navController) }
             
             composable(
@@ -128,7 +119,7 @@ fun OutcastersApp() {
                 arguments = listOf(
                     navArgument("sessionId") { type = NavType.StringType },
                     navArgument("mode") { defaultValue = "chat" },
-                    navArgument("lang") { defaultValue = "French" }
+                    navArgument("lang") { defaultValue = "English" }
                 )
             ) { backStackEntry ->
                 val sessionId = backStackEntry.arguments?.getString("sessionId")?.toLongOrNull()

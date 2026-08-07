@@ -1,62 +1,94 @@
 package com.example.inference
 
+import android.content.Context
+import android.util.Log
+import com.example.backend.inference.ChatMessage
+import com.example.backend.inference.GenerationConfig
+import com.example.backend.inference.PromptManager
+import com.example.backend.models.ModelManifest
 import com.example.backend.models.ModelParams
 import com.example.backend.models.ModelState
+import com.google.mediapipe.tasks.genai.llminference.LlmInference
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.delay
-import kotlin.random.Random
-import com.example.backend.inference.PromptManager
-import com.example.backend.inference.ChatMessage
-import com.example.backend.models.ModelManifest
-import com.example.backend.inference.GenerationConfig
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.onCompletion
-import android.util.Log
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import java.io.File
 
-data class Diagnostics(
-    val tokensPerSecond: Float = 0f,
-    val memoryUsageMb: Int = 0
-)
+data class Diagnostics(val tokensPerSecond: Float = 0f, val memoryUsageMb: Int = 0)
 
-class LlamaInferenceEngine {
+class LlamaInferenceEngine(private val context: Context) {
     private val _modelState = MutableStateFlow<ModelState>(ModelState.NotInstalled)
     val modelState: StateFlow<ModelState> = _modelState.asStateFlow()
-    
+
     private val _diagnostics = MutableStateFlow(Diagnostics())
     val diagnostics: StateFlow<Diagnostics> = _diagnostics.asStateFlow()
-    
-    var threadCount = 4
-    var contextWindow = 2048
-    
-    private val llamaBridge = LlamaBridge()
 
-    fun loadModel(modelPath: String) {
+    var threadCount = 4
+    var contextWindow = 1024
+    private val inferenceMutex = Mutex()
+
+    private var llmInference: LlmInference? = null
+    
+    // Channel for streaming responses
+    private var currentGenerationChannel: Channel<String>? = null
+
+    fun loadModel(modelFileName: String) {
         unloadModel()
         System.gc()
-        
-        val loaded = llamaBridge.loadModel(modelPath)
-        
-        if (loaded) {
+
+        try {
+            val modelsDir = File(context.filesDir, "models")
+            val modelFile = File(modelsDir, modelFileName)
+            
+            if (!modelFile.exists()) {
+                Log.e("LlamaInferenceEngine", "Model file not found: ${modelFile.absolutePath}")
+                _modelState.value = ModelState.NotInstalled
+                return
+            }
+
+            val options = LlmInference.LlmInferenceOptions.builder()
+                .setModelPath(modelFile.absolutePath)
+                .setMaxTokens(contextWindow)
+                .setResultListener { partialResult, done ->
+                    currentGenerationChannel?.trySend(partialResult ?: "")
+                    if (done) {
+                        currentGenerationChannel?.close()
+                    }
+                }
+                .build()
+
+            llmInference = LlmInference.createFromOptions(context, options)
+
             _modelState.value = ModelState.Active(
-                modelName = modelPath.substringAfterLast("/"),
+                modelName = modelFileName,
                 params = ModelParams(contextWindow = contextWindow, threadCount = threadCount)
             )
-            _diagnostics.value = Diagnostics(0f, Random.nextInt(800, 2000))
-        } else {
+            _diagnostics.value = Diagnostics(0f, 1200) // Approx memory for 2B models
+            Log.i("LlamaInferenceEngine", "MediaPipe LLM model loaded successfully.")
+
+        } catch (e: Exception) {
+            Log.e("LlamaInferenceEngine", "Failed to load model", e)
             _modelState.value = ModelState.NotInstalled
         }
     }
-    
+
     fun unloadModel() {
+        llmInference?.close()
+        llmInference = null
         _modelState.value = ModelState.NotInstalled
         _diagnostics.value = Diagnostics(0f, 0)
         System.gc()
     }
-    
+
     fun generate(
         newTask: String,
         history: List<ChatMessage> = emptyList(),
@@ -71,39 +103,63 @@ class LlamaInferenceEngine {
             quantization = "Q4"
         ),
         jobId: String = java.util.UUID.randomUUID().toString()
-    ): Flow<String> {
+    ): Flow<String> = flow {
         Log.i("LlamaInferenceEngine", "Generating for job $jobId, mode $mode")
         val builtPrompt = PromptManager.buildPrompt(manifest, history, newTask, mode, targetLanguage)
-        
-        return llamaBridge.generateStreamSafely(builtPrompt, 0.7f, 1024, jobId)
-            .catch { e ->
-                Log.e("LlamaInferenceEngine", "Error in generation: ${e.message}")
-                emit("Error: ${e.message}")
-            }
-            .onCompletion {
-                _diagnostics.value = _diagnostics.value.copy(tokensPerSecond = 0f)
-                llamaBridge.clearKvCache() // Prevent context leakage
-            }
-    }
-    
-    fun generate(prompt: String, config: GenerationConfig = GenerationConfig(), jobId: String = java.util.UUID.randomUUID().toString()): Flow<String> {
-        Log.i("LlamaInferenceEngine", "Generating custom prompt for job $jobId")
-        return llamaBridge.generateStreamSafely(prompt, config.temperature, config.maxTokens, jobId)
-            .catch { e ->
-                Log.e("LlamaInferenceEngine", "Error in generation: ${e.message}")
-                emit("Error: ${e.message}")
-            }
-            .onCompletion {
-                _diagnostics.value = _diagnostics.value.copy(tokensPerSecond = 0f)
-                llamaBridge.clearKvCache() // Prevent context leakage
-            }
-    }
-    
-    fun stopGeneration() {
-        if (_modelState.value is ModelState.Active) {
-            Log.i("LlamaInferenceEngine", "Stopping generation...")
-            llamaBridge.cancelActiveJob()
-            _diagnostics.value = _diagnostics.value.copy(tokensPerSecond = 0f)
+
+        if (llmInference == null) {
+            emit("Error: No local model loaded. Please go to the Models hub and download a model to run inference natively on your device.")
+            return@flow
         }
+
+        inferenceMutex.withLock {
+            val channel = Channel<String>(Channel.UNLIMITED)
+            currentGenerationChannel = channel
+            try {
+                llmInference!!.generateResponseAsync(builtPrompt)
+                for (chunk in channel) {
+                    emit(chunk)
+                }
+            } catch (e: Exception) {
+                Log.e("LlamaInferenceEngine", "Error in generation", e)
+                emit("Error: Model crashed during generation. ${e.message}")
+            } finally {
+                currentGenerationChannel = null
+            }
+        }
+    }.flowOn(Dispatchers.IO).onCompletion {
+        _diagnostics.value = _diagnostics.value.copy(tokensPerSecond = 0f)
+    }
+
+    fun generate(prompt: String, config: GenerationConfig = GenerationConfig(), jobId: String = java.util.UUID.randomUUID().toString()): Flow<String> = flow {
+        Log.i("LlamaInferenceEngine", "Generating custom prompt for job $jobId")
+        
+        if (llmInference == null) {
+            emit("Error: No local model loaded. Please download a model.")
+            return@flow
+        }
+        
+        inferenceMutex.withLock {
+            val channel = Channel<String>(Channel.UNLIMITED)
+            currentGenerationChannel = channel
+            try {
+                llmInference!!.generateResponseAsync(prompt)
+                for (chunk in channel) {
+                    emit(chunk)
+                }
+            } catch (e: Exception) {
+                Log.e("LlamaInferenceEngine", "Error in generation", e)
+                emit("Error: ${e.message}")
+            } finally {
+                currentGenerationChannel = null
+            }
+        }
+    }.flowOn(Dispatchers.IO).onCompletion {
+        _diagnostics.value = _diagnostics.value.copy(tokensPerSecond = 0f)
+    }
+
+    fun stopGeneration() {
+        Log.i("LlamaInferenceEngine", "Stopping generation not natively supported by basic MediaPipe sync call.")
+        _diagnostics.value = _diagnostics.value.copy(tokensPerSecond = 0f)
     }
 }

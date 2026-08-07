@@ -28,7 +28,7 @@ class HuggingFaceClientImpl(private val client: OkHttpClient) : IHuggingFaceClie
                                 val fileName = item.getString("path")
                                 val size = item.getLong("size")
                                 val downloadUrl = "https://huggingface.co/$repoId/resolve/main/$fileName"
-                                val format = if (fileName.endsWith(".gguf")) "gguf" else if (fileName.endsWith(".safetensors")) "safetensors" else "unknown"
+                                val format = if (fileName.endsWith(".tflite")) "tflite" else if (fileName.endsWith(".safetensors")) "safetensors" else "unknown"
                                 val quantization = extractQuantization(fileName)
                                 
                                 files.add(HfModelFile(fileName, downloadUrl, size, quantization, format))
@@ -45,7 +45,7 @@ class HuggingFaceClientImpl(private val client: OkHttpClient) : IHuggingFaceClie
 
     override suspend fun filterCompatibleArtifacts(files: List<HfModelFile>): List<HfModelFile> {
         // We filter for compatible local formats. Mostly GGUF for now.
-        return files.filter { it.format == "gguf" }
+        return files.filter { it.format == "tflite" }
     }
 
     private fun extractRepoId(url: String): String? {

@@ -53,7 +53,7 @@ interface InterviewSessionDao {
     fun getAllSessions(): Flow<List<InterviewSession>>
 }
 
-@Database(entities = [FailedConcept::class, InterviewSession::class, ModelManifest::class], version = 4, exportSchema = false)
+@Database(entities = [FailedConcept::class, InterviewSession::class, ModelManifest::class], version = 5, exportSchema = false)
 abstract class SrsDatabase : RoomDatabase() {
     abstract fun failedConceptDao(): FailedConceptDao
     abstract fun interviewSessionDao(): InterviewSessionDao

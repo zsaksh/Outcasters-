@@ -30,6 +30,7 @@ class ModelManagerViewModel(
     init {
         viewModelScope.launch {
             val currentModels = dao.getAllModels().first()
+            currentModels.forEach { if (it.chatTemplate.isEmpty()) { dao.update(it.copy(chatTemplate = "gemma")) } }
             if (currentModels.isEmpty()) {
                 initialModels.forEach { dao.insert(it) }
             }

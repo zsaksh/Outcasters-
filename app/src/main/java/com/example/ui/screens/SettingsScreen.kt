@@ -95,7 +95,7 @@ fun SettingsScreen(navController: NavController) {
             Text("Data Management", style = MaterialTheme.typography.titleMedium)
             
             Button(
-                onClick = { navController.navigate("model_management") },
+                onClick = { navController.navigate("models") },
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.secondaryContainer,

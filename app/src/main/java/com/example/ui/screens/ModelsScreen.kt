@@ -10,6 +10,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddLink
@@ -33,8 +34,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import com.example.OutcastersApplication
 import com.example.ui.theme.*
+import com.example.ui.viewmodels.ModelManagerViewModel
+import com.example.ui.viewmodels.ModelManagerViewModelFactory
+import com.example.backend.models.ModelManifest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -42,13 +48,22 @@ import java.io.File
 import java.io.FileOutputStream
 
 @Composable
-fun ModelsScreen(navController: NavController) {
-    val context = LocalContext.current
+fun ModelsScreen(
+    navController: NavController
+) {
+    val context = LocalContext.current.applicationContext as OutcastersApplication
+    val modelManagerViewModel: ModelManagerViewModel = viewModel(
+        factory = ModelManagerViewModelFactory(
+            context.container.modelManifestDao,
+            context.container.downloadManager
+        )
+    )
+    val localContext = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var isImporting by remember { mutableStateOf(false) }
 
-    val tiers = listOf("Lite", "Balanced", "Premium", "Multi")
-    var selectedTier by remember { mutableStateOf("Balanced") }
+    val allModels by modelManagerViewModel.allModels.collectAsState(initial = emptyList())
+    val activeModel by modelManagerViewModel.activeModel.collectAsState()
 
     val importLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -56,12 +71,12 @@ fun ModelsScreen(navController: NavController) {
         uri?.let {
             isImporting = true
             coroutineScope.launch {
-                val success = importModelFile(context, it)
+                val success = importModelFile(localContext, it)
                 isImporting = false
                 if (success) {
-                    Toast.makeText(context, "Model imported successfully", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(localContext, "Model imported successfully", Toast.LENGTH_SHORT).show()
                 } else {
-                    Toast.makeText(context, "Failed to import model", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(localContext, "Failed to import model", Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -83,92 +98,53 @@ fun ModelsScreen(navController: NavController) {
                 Text("Manage your local models", fontSize = 15.sp, color = TextSecondary, modifier = Modifier.padding(top = 4.dp))
             }
 
-            item {
-                Text("Recommended For You", fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = TextSecondary)
-                Spacer(modifier = Modifier.height(12.dp))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .padding(4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    tiers.forEach { tier ->
-                        val isSelected = selectedTier == tier
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(CircleShape)
-                                .background(if (isSelected) AccentTeal.copy(alpha = 0.2f) else Color.Transparent)
-                                .clickable { selectedTier = tier }
-                                .padding(vertical = 10.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = tier,
-                                fontSize = 13.sp,
-                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
-                                color = if (isSelected) AccentTeal else TextSecondary
-                            )
-                        }
-                    }
+            if (activeModel != null) {
+                item {
+                    Text("Active Model", fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = TextSecondary)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    ActiveModelCard(activeModel!!)
                 }
-            }
-
-            item {
-                Text("Active Model", fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = TextSecondary)
-                Spacer(modifier = Modifier.height(12.dp))
-                ActiveModelCard()
             }
 
             item {
                 Text("Available Models", fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = TextSecondary)
                 Spacer(modifier = Modifier.height(12.dp))
-                
-                when (selectedTier) {
-                    "Lite" -> {
-                        AvailableModelCard("SmolLM2 360M Instruct", "GGUF • Q4_K_M", "340 MB • 1.0 GB RAM", isDownloaded = true)
-                        Spacer(modifier = Modifier.height(12.dp))
-                        AvailableModelCard("Qwen 2.5 0.5B Instruct", "GGUF • Q4_K_M", "450 MB • 1.2 GB RAM", isDownloaded = false)
+            }
+
+            items(allModels) { model ->
+                AvailableModelCard(
+                    model = model,
+                    onClick = {
+                        if (model.installStatus == "not_installed" || model.installStatus == "failed") {
+                            modelManagerViewModel.startDownload(model.modelId)
+                        } else if (model.installStatus == "ready") {
+                            modelManagerViewModel.activateModel(model.modelId)
+                        }
                     }
-                    "Balanced" -> {
-                        AvailableModelCard("Llama 3.2 1B Instruct", "GGUF • Q4_K_M", "1.3 GB • 1.8 GB RAM", isDownloaded = false)
-                        Spacer(modifier = Modifier.height(12.dp))
-                        AvailableModelCard("Gemma 2 2B Instruct", "GGUF • Q4_K_M", "1.8 GB • 2.5 GB RAM", isDownloaded = false)
-                    }
-                    "Premium" -> {
-                        AvailableModelCard("Phi-3.5 Mini Instruct", "GGUF • Q4_K_M", "2.1 GB • 3.2 GB RAM", isDownloaded = false)
-                        Spacer(modifier = Modifier.height(12.dp))
-                        AvailableModelCard("Llama 3 8B Instruct", "GGUF • Q4_K_M", "4.5 GB • 6.0 GB RAM", isDownloaded = false)
-                    }
-                    "Multi" -> {
-                        AvailableModelCard("Mistral Nemo 12B", "GGUF • Q4_K_M", "6.2 GB • 8.0 GB RAM", isDownloaded = false)
-                        Spacer(modifier = Modifier.height(12.dp))
-                        AvailableModelCard("Aya 23 8B", "GGUF • Q4_K_M", "4.5 GB • 6.0 GB RAM", isDownloaded = false)
-                    }
-                }
+                )
+                Spacer(modifier = Modifier.height(12.dp))
             }
 
             item {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     ActionButton(
-                        modifier = Modifier.weight(1f), 
-                        icon = Icons.Filled.FolderZip, 
-                        text = if (isImporting) "Importing..." else "Import Model", 
+                        modifier = Modifier.weight(1f),
+                        icon = Icons.Filled.FolderZip,
+                        text = if (isImporting) "Importing..." else "Import Model",
                         color = AccentTeal,
                         enabled = !isImporting,
                         onClick = { importLauncher.launch(arrayOf("*/*")) }
                     )
+
                     val githubIntent = remember {
-                        android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/ggerganov/llama.cpp"))
+                        android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/google/mediapipe"))
                     }
                     ActionButton(
-                        modifier = Modifier.weight(1f), 
-                        icon = Icons.Filled.AddLink, 
-                        text = "Find on GitHub", 
+                        modifier = Modifier.weight(1f),
+                        icon = Icons.Filled.AddLink,
+                        text = "Find on GitHub",
                         color = AccentPurple,
-                        onClick = { context.startActivity(githubIntent) }
+                        onClick = { localContext.startActivity(githubIntent) }
                     )
                 }
                 Spacer(modifier = Modifier.height(32.dp))
@@ -180,7 +156,7 @@ fun ModelsScreen(navController: NavController) {
 suspend fun importModelFile(context: Context, uri: Uri): Boolean {
     return withContext(Dispatchers.IO) {
         try {
-            var fileName = "imported_model.gguf"
+            var fileName = "imported_model.tflite"
             context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
                 if (cursor.moveToFirst()) {
                     val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
@@ -189,12 +165,10 @@ suspend fun importModelFile(context: Context, uri: Uri): Boolean {
                     }
                 }
             }
-
             val modelsDir = File(context.filesDir, "models")
             if (!modelsDir.exists()) {
                 modelsDir.mkdirs()
             }
-
             val destFile = File(modelsDir, fileName)
             
             context.contentResolver.openInputStream(uri)?.use { inputStream ->
@@ -211,7 +185,7 @@ suspend fun importModelFile(context: Context, uri: Uri): Boolean {
 }
 
 @Composable
-fun ActiveModelCard() {
+fun ActiveModelCard(model: ModelManifest) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -233,8 +207,8 @@ fun ActiveModelCard() {
                 }
                 Spacer(modifier = Modifier.width(16.dp))
                 Column {
-                    Text("Qwen 2.5 0.5B Instruct", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = TextPrimary)
-                    Text("GGUF • Q4_K_M", fontSize = 13.sp, color = TextSecondary)
+                    Text(model.displayName, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = TextPrimary)
+                    Text("${model.format} • ${model.quantization}", fontSize = 13.sp, color = TextSecondary)
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Filled.CheckCircle, "Ready", tint = AccentTeal, modifier = Modifier.size(12.dp))
@@ -245,15 +219,13 @@ fun ActiveModelCard() {
                     }
                 }
             }
-
             Spacer(modifier = Modifier.height(20.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.surface)
             Spacer(modifier = Modifier.height(16.dp))
-
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                ModelStat(icon = Icons.Filled.Storage, label = "Size", value = "1.03 GB")
-                ModelStat(icon = Icons.Filled.Memory, label = "RAM", value = "1.6 GB")
-                ModelStat(icon = Icons.Filled.DataUsage, label = "Context", value = "32K")
+                val sizeStr = String.format("%.2f GB", model.fileSizeBytes / (1024.0 * 1024.0 * 1024.0))
+                ModelStat(icon = Icons.Filled.Storage, label = "Size", value = sizeStr)
+                ModelStat(icon = Icons.Filled.Memory, label = "RAM", value = "${model.estimatedRamMB} MB")
             }
         }
     }
@@ -270,12 +242,12 @@ fun ModelStat(icon: ImageVector, label: String, value: String) {
 }
 
 @Composable
-fun AvailableModelCard(title: String, format: String, stats: String, isDownloaded: Boolean) {
+fun AvailableModelCard(model: ModelManifest, onClick: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.medium)
-            .clickable { },
+            .clickable { onClick() },
         shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
@@ -299,13 +271,20 @@ fun AvailableModelCard(title: String, format: String, stats: String, isDownloade
                 }
                 Spacer(modifier = Modifier.width(16.dp))
                 Column {
-                    Text(title, fontWeight = FontWeight.Medium, fontSize = 15.sp, color = TextPrimary)
-                    Text(format, fontSize = 12.sp, color = TextSecondary)
-                    Text(stats, fontSize = 12.sp, color = TextSecondary)
+                    Text(model.displayName, fontWeight = FontWeight.Medium, fontSize = 15.sp, color = TextPrimary)
+                    Text("${model.format} • ${model.quantization}", fontSize = 12.sp, color = TextSecondary)
+                    val sizeStr = String.format("%.2f GB", model.fileSizeBytes / (1024.0 * 1024.0 * 1024.0))
+                    Text("$sizeStr • ${model.estimatedRamMB} MB RAM", fontSize = 12.sp, color = TextSecondary)
                 }
             }
-            if (isDownloaded) {
-                Icon(Icons.Filled.FileDownload, "Downloaded", tint = AccentTeal)
+            if (model.installStatus == "ready") {
+                Icon(Icons.Filled.CheckCircle, "Ready", tint = AccentTeal)
+            } else if (model.installStatus == "downloading") {
+                CircularProgressIndicator(
+                    progress = { model.downloadProgress / 100f },
+                    modifier = Modifier.size(24.dp),
+                    color = AccentTeal
+                )
             } else {
                 Icon(Icons.Filled.CloudDownload, "Download", tint = TextSecondary)
             }
@@ -315,10 +294,10 @@ fun AvailableModelCard(title: String, format: String, stats: String, isDownloade
 
 @Composable
 fun ActionButton(
-    modifier: Modifier, 
-    icon: ImageVector, 
-    text: String, 
-    color: Color, 
+    modifier: Modifier,
+    icon: ImageVector,
+    text: String,
+    color: Color,
     enabled: Boolean = true,
     onClick: () -> Unit
 ) {
@@ -326,7 +305,7 @@ fun ActionButton(
         onClick = onClick,
         modifier = modifier.height(48.dp),
         colors = ButtonDefaults.buttonColors(
-            containerColor = color.copy(alpha = 0.15f), 
+            containerColor = color.copy(alpha = 0.15f),
             contentColor = color,
             disabledContainerColor = color.copy(alpha = 0.05f),
             disabledContentColor = color.copy(alpha = 0.5f)

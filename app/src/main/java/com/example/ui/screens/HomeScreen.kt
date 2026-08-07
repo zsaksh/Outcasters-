@@ -66,7 +66,7 @@ fun HomeScreen(navController: NavController) {
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Outcasters", fontWeight = FontWeight.Bold, fontSize = 24.sp, color = TextPrimary)
                         }
-                        Text("Local AI for learning", fontSize = 14.sp, color = TextSecondary, modifier = Modifier.padding(top = 4.dp))
+                        Text("Local AI Assistant", fontSize = 14.sp, color = TextSecondary, modifier = Modifier.padding(top = 4.dp))
                     }
 
                     // Status Pill
@@ -180,19 +180,11 @@ fun HomeScreen(navController: NavController) {
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        QuickActionCard(modifier = Modifier.weight(1f), icon = Icons.Filled.Lightbulb, title = "Learn", subtitle = "Concepts", iconTint = AccentTeal, onClick = { navController.navigate("learn") })
                         QuickActionCard(modifier = Modifier.weight(1f), icon = Icons.Filled.ChatBubbleOutline, title = "Chat", subtitle = "With AI", iconTint = AccentPurple, onClick = { navController.navigate("chat") })
-                    }
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        QuickActionCard(modifier = Modifier.weight(1f), icon = Icons.Filled.Language, title = "Language", subtitle = "Practice", iconTint = AccentOrange, onClick = { navController.navigate("learn") })
-                        QuickActionCard(modifier = Modifier.weight(1f), icon = Icons.Filled.Psychology, title = "Interview", subtitle = "Prep", iconTint = AccentTeal, onClick = { navController.navigate("learn") })
-                    }
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        QuickActionCard(modifier = Modifier.fillMaxWidth(), icon = Icons.Filled.Settings, title = "Models Hub", subtitle = "Manage local AI", iconTint = Color.Gray, onClick = { navController.navigate("models") })
+                        QuickActionCard(modifier = Modifier.weight(1f), icon = Icons.Filled.Settings, title = "Models Hub", subtitle = "Manage local AI", iconTint = Color.Gray, onClick = { navController.navigate("models") })
                     }
                 }
             }
-
             // Recent Activity
             item {
                 Row(
@@ -201,7 +193,6 @@ fun HomeScreen(navController: NavController) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text("Recent Activity", fontWeight = FontWeight.SemiBold, fontSize = 18.sp, color = TextPrimary)
-                    Text("See all", fontSize = 14.sp, color = TextSecondary, modifier = Modifier.clickable { navController.navigate("library") })
                 }
             }
 

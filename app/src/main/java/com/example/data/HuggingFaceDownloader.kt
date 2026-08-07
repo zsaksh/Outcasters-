@@ -54,6 +54,6 @@ class HuggingFaceDownloader(private val context: Context) {
     }.flowOn(Dispatchers.IO)
 
     fun getDownloadedModels(): List<File> {
-        return context.filesDir.listFiles { _, name -> name.endsWith(".gguf") }?.toList() ?: emptyList()
+        return context.filesDir.listFiles { _, name -> name.endsWith(".tflite") }?.toList() ?: emptyList()
     }
 }

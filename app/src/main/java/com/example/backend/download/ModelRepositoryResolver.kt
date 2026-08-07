@@ -36,7 +36,7 @@ class ModelRepositoryResolver(private val client: HttpClient = HttpClient(Androi
                 val path = item.optString("path")
                 val size = item.optLong("size", 0L)
                 
-                if (type == "file" && path.endsWith(".gguf", ignoreCase = true)) {
+                if (type == "file" && path.endsWith(".tflite", ignoreCase = true)) {
                     val quant = extractQuantization(path)
                     val downloadUrl = "https://huggingface.co/\$repoId/resolve/main/\$path"
                     
