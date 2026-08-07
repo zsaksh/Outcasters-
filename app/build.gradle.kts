@@ -29,6 +29,11 @@ android {
   buildFeatures {
     compose = true
   }
+  externalNativeBuild {
+    cmake {
+      path("src/main/cpp/CMakeLists.txt")
+    }
+  }
   testOptions {
     unitTests {
       isIncludeAndroidResources = true

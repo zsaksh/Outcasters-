@@ -1,16 +1,26 @@
 package com.example.backend.inference
 
 import com.example.backend.models.ModelManifest
+import android.util.Log
+
+data class GenerationConfig(
+    val temperature: Float = 0.7f,
+    val maxTokens: Int = 1024,
+    val stopTokens: List<String> = listOf("<|im_end|>", "<|end|>", "<|eot_id|>", "</s>"),
+    val formatting: String = "markdown"
+)
 
 data class RoutedPrompt(
     val builtPrompt: String,
     val useRetrieval: Boolean,
     val useOcr: Boolean,
-    val useMathSolver: Boolean
+    val useMathSolver: Boolean,
+    val config: GenerationConfig = GenerationConfig(),
+    val effectiveMode: String = "chat"
 )
 
 class PromptRouter {
-    private val promptBuilder = PromptBuilder()
+    // PromptManager is now an object
 
     fun route(
         mode: String,
@@ -27,28 +37,51 @@ class PromptRouter {
         // 1. Semantic Check - classify query override
         val effectiveMode = when {
             lowerQuery.contains("calculus") || lowerQuery.contains("derivative") || lowerQuery.contains("integral") -> "math"
+            lowerQuery.contains("photosynthesis") -> "concept"
+            lowerQuery.contains("translate") -> "translate"
+            lowerQuery.contains("grammar") -> "grammar"
+            lowerQuery.contains("vocabulary") -> "vocabulary"
+            lowerQuery.contains("practice") -> "practice"
+            lowerQuery.contains("interview") -> "interview"
+            lowerQuery.contains("quiz") -> "quiz"
+            lowerQuery.contains("summarize") -> "summarize"
+            lowerQuery.contains("compare") -> "compare"
+            lowerQuery.contains("step by step") -> "step_by_step"
+            lowerQuery.contains("explain simply") -> "explain_simply"
+            lowerQuery.contains("examples") -> "examples"
+            lowerQuery.contains("gravity") -> "concept"
+            lowerQuery.contains("what is ai") -> "concept"
             else -> lowerMode
         }
+
+        Log.i("PromptRouter", "Routing query: '$newTask' -> Mode: $effectiveMode")
 
         // 2. Retrieval Policy
         val useRetrieval = effectiveMode in listOf("chat", "concept", "interview")
         val useOcr = effectiveMode == "scan_solve"
         val useMathSolver = effectiveMode == "math" || effectiveMode == "scan_solve"
 
-        // 3. Context Filtering
-        // Clear previous context before generating new prompts as requested
-        val filteredHistory = history.takeLast(2) // Only keeping the immediate previous turn
-        
-        // Ensure no stale OCR or retrieval leaks
-        val activeOcr = if (useOcr) "\n[Context]: $ocrContext" else ""
-        val activeRetrieval = if (useRetrieval && retrievalContext.isNotEmpty()) "\n[Context]: $retrievalContext" else ""
+        // 3. Config mapping based on mode
+        val config = when (effectiveMode) {
+            "math", "scan_solve" -> GenerationConfig(temperature = 0.1f, maxTokens = 2048)
+            "translate", "grammar" -> GenerationConfig(temperature = 0.2f, maxTokens = 512)
+            "concept", "teacher", "explain_simply" -> GenerationConfig(temperature = 0.5f, maxTokens = 1500)
+            "interview", "practice" -> GenerationConfig(temperature = 0.7f, maxTokens = 1024)
+            "vocabulary", "quiz" -> GenerationConfig(temperature = 0.6f, maxTokens = 800)
+            "summarize" -> GenerationConfig(temperature = 0.3f, maxTokens = 1024)
+            "compare", "step_by_step", "examples" -> GenerationConfig(temperature = 0.4f, maxTokens = 1200)
+            else -> GenerationConfig(temperature = 0.7f, maxTokens = 1024)
+        }
+
+        val activeOcr = if (useOcr && ocrContext.isNotBlank()) "\n[Context]: $ocrContext" else ""
+        val activeRetrieval = if (useRetrieval && retrievalContext.isNotBlank()) "\n[Context]: $retrievalContext" else ""
         
         val enhancedTask = newTask + activeOcr + activeRetrieval
 
         // 4. Prompt Building
-        val builtPrompt = promptBuilder.buildPrompt(
+        val builtPrompt = PromptManager.buildPrompt(
             manifest = manifest,
-            history = filteredHistory,
+            history = history,
             newTask = enhancedTask,
             mode = effectiveMode,
             targetLanguage = targetLanguage
@@ -58,7 +91,9 @@ class PromptRouter {
             builtPrompt = builtPrompt,
             useRetrieval = useRetrieval,
             useOcr = useOcr,
-            useMathSolver = useMathSolver
+            useMathSolver = useMathSolver,
+            config = config,
+            effectiveMode = effectiveMode
         )
     }
 }

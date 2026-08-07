@@ -595,7 +595,7 @@ fun ChatScreen(navController: NavController, sessionId: Long? = null, mode: Stri
                                             streamingResponse = ""
                                             val promptRouter = com.example.backend.inference.PromptRouter()
                                             val postProcessor = com.example.backend.inference.PostProcessor()
-                                            val history = messages.map { com.example.backend.inference.ChatMessage(it.role, it.content) }
+                                            val history = messages.map { com.example.backend.inference.ChatMessage(role = it.role, content = it.content, mode = currentMode, model = activeModel?.modelId ?: "", language = currentTargetLanguage) }
                                             val manifest = activeModel ?: com.example.backend.models.ModelManifest(modelId = "dummy", displayName = "Dummy", sourceUrl = "", fileName = "", chatTemplate = "fallback")
                                             val scannedText = navController.currentBackStackEntry?.savedStateHandle?.get<String>("scanned_text") ?: ""
                                             val routedPrompt = promptRouter.route(
@@ -633,13 +633,7 @@ fun ChatScreen(navController: NavController, sessionId: Long? = null, mode: Stri
                                             
                                             llamaBridge.clearKvCache()
                                             
-                                            val systemContext = "You are Outcasters AI, a private local study assistant."
-                                            val formattedPrompt = com.example.inference.ChatTemplateFormatter.formatSmolLM2(
-                                                messages = history.takeLast(2) + com.example.backend.inference.ChatMessage("user", text),
-                                                systemPrompt = systemContext
-                                            )
-                                            
-                                            val responseFlow = inferenceEngine.generate(formattedPrompt)
+                                            val responseFlow = inferenceEngine.generate(routedPrompt.builtPrompt, routedPrompt.config)
                                             var fullResponse = ""
                                             responseFlow.collect { word -> 
                                                 fullResponse += word 

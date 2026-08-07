@@ -43,3 +43,12 @@ interface OcrDao {
     @Query("DELETE FROM ocr_scans WHERE id = :scanId")
     suspend fun deleteScan(scanId: Long)
 }
+
+@Dao
+interface InferenceMetadataDao {
+    @Insert
+    suspend fun insertMetadata(metadata: InferenceMetadataEntity)
+
+    @Query("SELECT * FROM inference_metadata ORDER BY timestamp DESC")
+    fun getAllMetadata(): Flow<List<InferenceMetadataEntity>>
+}

@@ -19,7 +19,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 class AppContainer(private val context: Context) {
     val database by lazy {
         Room.databaseBuilder(context, AppDatabase::class.java, "outcasters_db")
-            .fallbackToDestructiveMigration()
+            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4)
             .build()
     }
     
@@ -35,6 +35,14 @@ class AppContainer(private val context: Context) {
     
     val modelRepository: ModelRepository by lazy {
         ModelRepositoryImpl(context)
+    }
+
+    val chatRepository: com.example.data.ChatRepository by lazy {
+        com.example.data.ChatRepository(chatDao)
+    }
+
+    val inferenceLogger: com.example.backend.inference.InferenceLogger by lazy {
+        com.example.backend.inference.InferenceLogger(database.inferenceMetadataDao())
     }
 
     val downloadManager: DownloadManager by lazy {

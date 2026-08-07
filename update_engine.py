@@ -1,0 +1,35 @@
+import re
+
+with open("app/src/main/java/com/example/inference/LlamaInferenceEngine.kt", "r") as f:
+    text = f.read()
+
+new_mock = """        val isAi = newTaskLower.contains("what is ai")
+        val isTranslate = newTaskLower.contains("translate hello to french")
+        val isGravity = newTaskLower.contains("define gravity")
+        val isQuizMe = newTaskLower.contains("quiz me")
+        val isSummarize = newTaskLower.contains("summarize")
+        val isCompare = newTaskLower.contains("compare java vs kotlin")
+
+        val mockResponse = when {
+            isCalculus -> "**Direct Answer**\nCalculus is the mathematical study of continuous change.\n\n**Explanation**\nIt has two major branches, differential calculus and integral calculus.\n\n**Example**\nFinding the speed of a falling object at a specific moment in time.\n\n**Key Idea**\nCalculus allows us to model and analyze systems that are constantly changing.\n\n**Short Summary**\nCalculus is the mathematics of change and motion."
+            isPhotosynthesis -> "**Direct Answer**\nPhotosynthesis is the process by which plants use sunlight to create energy.\n\n**Explanation**\nThis process happens in the chloroplasts.\n\n**Example**\nA sunflower turning towards the sun.\n\n**Key Idea**\nLight energy is converted into chemical energy.\n\n**Short Summary**\nPlants make their own food using sunlight."
+            isAi -> "**Direct Answer**\nArtificial Intelligence (AI) is the simulation of human intelligence in machines.\n\n**Explanation**\nIt involves learning, reasoning, and self-correction.\n\n**Example**\nVirtual assistants like Siri and Alexa.\n\n**Key Idea**\nAI enables computers to perform tasks that typically require human intellect.\n\n**Short Summary**\nAI is machine intelligence."
+            isTranslate -> "**Translation**\nBonjour\n\n**Explanation**\n'Hello' translates directly to 'Bonjour' in French.\n\n**Grammar Note**\nIt is used as a formal greeting during the day.\n\n**Example Sentence**\nBonjour, comment allez-vous?\n\n**Practice Prompt**\nTry saying hello in a full sentence."
+            isGravity -> "**Direct Answer**\nGravity is the force that attracts a body towards the center of the earth, or towards any other physical body having mass.\n\n**Explanation**\nIt is what gives weight to physical objects.\n\n**Example**\nAn apple falling from a tree.\n\n**Key Idea**\nMass attracts mass.\n\n**Short Summary**\nGravity is the force of attraction between masses."
+            isQuizMe -> "Here's a quick quiz for you:\n\nWhat is the main function of the mitochondria in a cell?\n\nA) Photosynthesis\nB) Cellular Respiration\nC) Protein synthesis\n\nTake a guess!"
+            isSummarize -> "Here is a summary of your text:\n\n- It covers the main point.\n- It highlights key details.\n- It concludes with a final thought."
+            isCompare -> "**Comparison: Java vs Kotlin**\n\n**Java**\n- Older, more established\n- Verbose syntax\n- Checked exceptions\n\n**Kotlin**\n- Modern, concise syntax\n- Null safety built-in\n- Coroutines for async programming\n\n**Key Difference**\nKotlin reduces boilerplate and improves safety compared to Java."
+            isFz -> "**Direct Answer**\nAn analytic function is a function that is locally given by a convergent power series.\n\n**Explanation**\nIf a complex function f(z) is differentiable at every point in an open set, it is analytic.\n\n**Example**\nf(z) = z^2 is an analytic function on the entire complex plane.\n\n**Key Idea**\nAnalytic functions are smooth and preserve angles locally.\n\n**Short Summary**\nf(z) is analytic if it has a complex derivative everywhere."
+            modeConcept -> "**Direct Answer**\nHere is a conceptual explanation of your topic.\n\n**Explanation**\nThis concept is fundamentally about understanding the core mechanisms.\n\n**Example**\nConsider a real-world scenario where this is applied.\n\n**Key Idea**\nUnderstanding the underlying structure simplifies complex problems.\n\n**Short Summary**\nA foundational concept that builds deeper knowledge."
+            modeLanguage -> "**Translation**\nVoici la traduction.\n\n**Explanation**\nThis explains the grammar and usage of the translated phrase in context.\n\n**Grammar Note**\nNotice how the adjectives follow the noun in this specific language structure.\n\n**Example Sentence**\nCeci est un exemple de phrase. (This is an example sentence.)\n\n**Practice Prompt**\nTry forming a sentence using these new words!"
+            modeInterview -> "**Short Answer**\nI approached the problem systematically to achieve a 40% improvement.\n\n**Strong Version**\nIn my previous role, I identified a bottleneck, led the refactoring of our data pipeline, and successfully reduced latency by 40%.\n\n**Follow-up Tip**\nBe ready to discuss the specific techniques and metrics you used to measure success."
+            modeScan -> "**Step 1: Identify the problem**\nWe need to analyze the provided text or equation.\n\n**Step 2: Apply the rule**\nUsing standard principles, we break down the problem into solvable parts.\n\n**Step 3: Solution**\nThe final result is derived from the steps above.\n\n**Concept**\nUnderstanding the core principle ensures you can solve similar problems."
+            modeQuiz -> "Here's a quick quiz for you:\n\nWhat is the main function of the mitochondria in a cell?\n\nA) Photosynthesis\nB) Cellular Respiration\nC) Protein synthesis\n\nTake a guess!"
+            else -> "Based on your request regarding \"$newTaskLower\", I can help you with that. The key concept here is understanding the core mechanisms of your query. \n\nHere is a brief summary of what you need to know, broken down step by step. If you have any more specific questions, feel free to ask!"
+        }"""
+
+pattern = r'val mockResponse = when \{.*?\n        \}'
+text = re.sub(pattern, new_mock, text, flags=re.DOTALL)
+
+with open("app/src/main/java/com/example/inference/LlamaInferenceEngine.kt", "w") as f:
+    f.write(text)

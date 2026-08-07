@@ -16,7 +16,12 @@ data class ChatMessageEntity(
     val sessionId: Long,
     val role: String,
     val content: String,
-    val timestamp: Long
+    val timestamp: Long,
+    // Metadata tracking for inference pipeline
+    val model: String = "",
+    val mode: String = "",
+    val language: String = "",
+    val tokenCount: Int = 0
 )
 
 @Entity(tableName = "ocr_scans")
@@ -24,5 +29,16 @@ data class OcrScanEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val title: String,
     val extractedText: String,
+    val timestamp: Long
+)
+
+@Entity(tableName = "inference_metadata")
+data class InferenceMetadataEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val sessionId: Long,
+    val latencyMs: Long,
+    val tokenCount: Int,
+    val memoryUsageMb: Int,
+    val model: String,
     val timestamp: Long
 )
