@@ -1,0 +1,1 @@
+sed -i 's/val activeModel = allModels.find { it.activeStatus }/val activeModel = allModels.find { it.activeStatus }\n    val modelState by inferenceEngine.modelState.collectAsState()/g' app/src/main/java/com/example/ui/screens/ChatScreen.kt

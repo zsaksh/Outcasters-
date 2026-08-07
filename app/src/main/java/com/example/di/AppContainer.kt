@@ -49,10 +49,11 @@ class AppContainer(private val context: Context) {
         DownloadManager(context, modelManifestDao)
     }
 
-    // A fully compliant lazy loader tracking db state
     val inferenceEngine: LlamaInferenceEngine by lazy {
         val engine = LlamaInferenceEngine(context)
-        CoroutineScope(Dispatchers.IO).launch {
+        val scope = CoroutineScope(Dispatchers.IO)
+        
+        scope.launch {
             modelManifestDao.getAllModels()
                 .map { models -> models.find { it.activeStatus }?.fileName }
                 .distinctUntilChanged()
@@ -64,6 +65,22 @@ class AppContainer(private val context: Context) {
                     }
                 }
         }
+        
+        scope.launch {
+            engine.modelState.collectLatest { state ->
+                if (state is com.example.backend.models.ModelState.Failed) {
+                    val activeModel = modelManifestDao.getActiveModel()
+                    if (activeModel != null) {
+                        modelManifestDao.update(activeModel.copy(
+                            activeStatus = false,
+                            installStatus = "corrupted",
+                            errorState = "Model failed to load. Try a smaller model or clear memory."
+                        ))
+                    }
+                }
+            }
+        }
+        
         engine
     }
 }

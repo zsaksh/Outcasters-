@@ -29,7 +29,8 @@ class PromptRouter {
         history: List<ChatMessage>,
         newTask: String,
         ocrContext: String,
-        retrievalContext: String
+        retrievalContext: String,
+        isNewSession: Boolean = true
     ): RoutedPrompt {
         val activeOcr = if (ocrContext.isNotBlank()) "\n[Context]: $ocrContext" else ""
         
@@ -40,7 +41,8 @@ class PromptRouter {
             history = history,
             newTask = enhancedTask,
             mode = "chat",
-            targetLanguage = targetLanguage
+            targetLanguage = targetLanguage,
+            isNewSession = isNewSession
         )
 
         return RoutedPrompt(

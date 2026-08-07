@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.OutcastersApplication
 import com.example.ui.theme.*
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -100,6 +101,7 @@ fun LibraryScreen(navController: NavController) {
                     }
                 } else {
                     items(filteredItems) { item ->
+                        val scope = rememberCoroutineScope()
                         LibraryItemCard(
                             title = item.title,
                             subtitle = item.subtitle,
@@ -111,6 +113,15 @@ fun LibraryScreen(navController: NavController) {
                                     navController.navigate("chat/${item.id}")
                                 } else {
                                     // Navigate to scan if supported
+                                }
+                            },
+                            onDelete = {
+                                scope.launch {
+                                    if (item.type == "chat") {
+                                        container.chatDao.deleteSession(item.id)
+                                    } else {
+                                        container.ocrDao.deleteScan(item.id)
+                                    }
                                 }
                             }
                         )
@@ -128,7 +139,8 @@ fun LibraryScreen(navController: NavController) {
 data class HistoryItem(val id: Long, val title: String, val subtitle: String, val icon: ImageVector, val tint: Color, val timestamp: Long, val type: String)
 
 @Composable
-fun LibraryItemCard(title: String, subtitle: String, icon: ImageVector, time: String, tint: Color, onClick: () -> Unit) {
+fun LibraryItemCard(title: String, subtitle: String, icon: ImageVector, time: String, tint: Color, onClick: () -> Unit, onDelete: () -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -164,7 +176,25 @@ fun LibraryItemCard(title: String, subtitle: String, icon: ImageVector, time: St
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(time, fontSize = 13.sp, color = TextSecondary)
                 Spacer(modifier = Modifier.width(8.dp))
-                Icon(Icons.Filled.MoreVert, contentDescription = "More", tint = TextSecondary, modifier = Modifier.size(20.dp))
+                Box {
+                    IconButton(onClick = { expanded = true }, modifier = Modifier.size(24.dp)) {
+                        Icon(Icons.Filled.MoreVert, contentDescription = "More", tint = TextSecondary, modifier = Modifier.size(20.dp))
+                    }
+                    DropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false },
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Delete", color = Color.Red) },
+                            onClick = {
+                                expanded = false
+                                onDelete()
+                            },
+                            leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = Color.Red) }
+                        )
+                    }
+                }
             }
         }
     }

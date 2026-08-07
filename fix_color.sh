@@ -1,0 +1,1 @@
+sed -i 's/color = TextSecondary/color = if (modelState is com.example.backend.models.ModelState.Failed) androidx.compose.ui.graphics.Color.Red else TextSecondary/g' app/src/main/java/com/example/ui/screens/ChatScreen.kt

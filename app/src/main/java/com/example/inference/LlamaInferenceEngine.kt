@@ -33,10 +33,12 @@ class LlamaInferenceEngine(private val context: Context) {
     val diagnostics: StateFlow<Diagnostics> = _diagnostics.asStateFlow()
 
     var threadCount = 4
-    var contextWindow = 1024
+    var contextWindow = 2048
     private val inferenceMutex = Mutex()
 
     private var llmInference: LlmInference? = null
+    private var currentOptions: LlmInference.LlmInferenceOptions? = null
+    private var lastSessionId: String? = null
     
     // Channel for streaming responses
     private var currentGenerationChannel: Channel<String>? = null
@@ -44,6 +46,7 @@ class LlamaInferenceEngine(private val context: Context) {
     fun loadModel(modelFileName: String) {
         unloadModel()
         System.gc()
+        _modelState.value = com.example.backend.models.ModelState.Loading
 
         try {
             val modelsDir = File(context.filesDir, "models")
@@ -66,6 +69,8 @@ class LlamaInferenceEngine(private val context: Context) {
                 }
                 .build()
 
+            currentOptions = options
+            lastSessionId = null
             llmInference = LlmInference.createFromOptions(context, options)
 
             _modelState.value = ModelState.Active(
@@ -77,7 +82,7 @@ class LlamaInferenceEngine(private val context: Context) {
 
         } catch (e: Exception) {
             Log.e("LlamaInferenceEngine", "Failed to load model", e)
-            _modelState.value = ModelState.NotInstalled
+            _modelState.value = ModelState.Failed(com.example.backend.models.ErrorType.UNKNOWN, e.localizedMessage ?: "Unknown error")
         }
     }
 
@@ -87,6 +92,7 @@ class LlamaInferenceEngine(private val context: Context) {
         _modelState.value = ModelState.NotInstalled
         _diagnostics.value = Diagnostics(0f, 0)
         System.gc()
+        _modelState.value = com.example.backend.models.ModelState.Loading
     }
 
     fun generate(
@@ -105,7 +111,19 @@ class LlamaInferenceEngine(private val context: Context) {
         jobId: String = java.util.UUID.randomUUID().toString()
     ): Flow<String> = flow {
         Log.i("LlamaInferenceEngine", "Generating for job $jobId, mode $mode")
-        val builtPrompt = PromptManager.buildPrompt(manifest, history, newTask, mode, targetLanguage)
+        if (lastSessionId != null && lastSessionId != jobId) {
+            Log.i("LlamaInferenceEngine", "Switching conversation session. Recreating LlmInference.")
+            currentOptions?.let { 
+                llmInference?.close()
+                llmInference = LlmInference.createFromOptions(context, it)
+            }
+        }
+
+        val isNewSession = (lastSessionId != jobId) || (llmInference == null)
+        lastSessionId = jobId
+        val effectiveHistory = if (isNewSession) history else emptyList<ChatMessage>()
+
+        val builtPrompt = PromptManager.buildPrompt(manifest, effectiveHistory, newTask, mode, targetLanguage, isNewSession)
 
         if (llmInference == null) {
             emit("Error: No local model loaded. Please go to the Models hub and download a model to run inference natively on your device.")
@@ -133,6 +151,15 @@ class LlamaInferenceEngine(private val context: Context) {
 
     fun generate(prompt: String, config: GenerationConfig = GenerationConfig(), jobId: String = java.util.UUID.randomUUID().toString()): Flow<String> = flow {
         Log.i("LlamaInferenceEngine", "Generating custom prompt for job $jobId")
+        
+        if (lastSessionId != null && lastSessionId != jobId) {
+            Log.i("LlamaInferenceEngine", "Switching conversation session. Recreating LlmInference.")
+            currentOptions?.let { 
+                llmInference?.close()
+                llmInference = LlmInference.createFromOptions(context, it)
+            }
+        }
+        lastSessionId = jobId
         
         if (llmInference == null) {
             emit("Error: No local model loaded. Please download a model.")

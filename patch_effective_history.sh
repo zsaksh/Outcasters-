@@ -1,0 +1,1 @@
+sed -i 's/val effectiveHistory = if (history.isEmpty()) emptyList() else emptyList<ChatMessage>() \/\/ NEVER PASS HISTORY, MediaPipe is stateful!/val effectiveHistory = if (isNewSession) history else emptyList<ChatMessage>()/g' app/src/main/java/com/example/inference/LlamaInferenceEngine.kt

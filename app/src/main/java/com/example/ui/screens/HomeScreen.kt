@@ -18,6 +18,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -32,6 +36,9 @@ import androidx.navigation.NavController
 import com.example.OutcastersApplication
 import com.example.backend.models.ModelState
 import com.example.ui.theme.*
+import kotlinx.coroutines.launch
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Delete
 
 @Composable
 fun HomeScreen(navController: NavController) {
@@ -66,7 +73,7 @@ fun HomeScreen(navController: NavController) {
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Outcasters", fontWeight = FontWeight.Bold, fontSize = 24.sp, color = TextPrimary)
                         }
-                        Text("Local AI Assistant", fontSize = 14.sp, color = TextSecondary, modifier = Modifier.padding(top = 4.dp))
+                        Text("Local AI for learning", fontSize = 14.sp, color = TextSecondary, modifier = Modifier.padding(top = 4.dp))
                     }
 
                     // Status Pill
@@ -207,11 +214,16 @@ fun HomeScreen(navController: NavController) {
                         Text("No recent activity", color = TextSecondary, fontSize = 14.sp)
                     } else {
                         filteredSessions.take(3).forEach { session ->
+                            val scope = rememberCoroutineScope()
                             RecentActivityItem(
-
                                 title = session.title,
                                 time = android.text.format.DateUtils.getRelativeTimeSpanString(session.timestamp).toString(),
-                                onClick = { navController.navigate("chat/${session.id}") }
+                                onClick = { navController.navigate("chat/${session.id}") },
+                                onDelete = {
+                                    scope.launch {
+                                        app.container.chatDao.deleteSession(session.id)
+                                    }
+                                }
                             )
                         }
                     }
@@ -251,7 +263,8 @@ fun QuickActionCard(modifier: Modifier, icon: ImageVector, title: String, subtit
 }
 
 @Composable
-fun RecentActivityItem(title: String, time: String, onClick: () -> Unit = {}) {
+fun RecentActivityItem(title: String, time: String, onClick: () -> Unit = {}, onDelete: () -> Unit = {}) {
+    var expanded by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -270,7 +283,25 @@ fun RecentActivityItem(title: String, time: String, onClick: () -> Unit = {}) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(time, fontSize = 13.sp, color = TextSecondary)
             Spacer(modifier = Modifier.width(8.dp))
-            Icon(Icons.Filled.ChevronRight, contentDescription = "Go", tint = TextSecondary, modifier = Modifier.size(16.dp))
+            Box {
+                IconButton(onClick = { expanded = true }, modifier = Modifier.size(24.dp)) {
+                    Icon(Icons.Filled.MoreVert, contentDescription = "More", tint = TextSecondary, modifier = Modifier.size(16.dp))
+                }
+                DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false },
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Delete", color = Color.Red) },
+                        onClick = {
+                            expanded = false
+                            onDelete()
+                        },
+                        leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = Color.Red) }
+                    )
+                }
+            }
         }
     }
 }

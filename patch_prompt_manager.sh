@@ -1,0 +1,1 @@
+sed -i 's/Respond in $targetLanguage."/Respond in $targetLanguage. If the user prompt is ambiguous, confusing, or lacks necessary context to provide a good answer, DO NOT guess or hallucinate. Instead, actively ask the user a clarifying question to better understand their intent."/g' app/src/main/java/com/example/backend/inference/PromptManager.kt

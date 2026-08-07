@@ -1,0 +1,1 @@
+sed -i 's/val builtPrompt = PromptManager.buildPrompt(manifest, effectiveHistory, newTask, mode, targetLanguage)/val isNewSession = (lastSessionId != jobId) || (llmInference == null)\n        val builtPrompt = PromptManager.buildPrompt(manifest, effectiveHistory, newTask, mode, targetLanguage, isNewSession)/g' app/src/main/java/com/example/inference/LlamaInferenceEngine.kt

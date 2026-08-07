@@ -13,12 +13,19 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.buildAnnotatedString
+import android.content.Intent
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -42,6 +49,7 @@ fun ChatScreen(navController: NavController, sessionId: Long?, mode: String, tar
     val modelManifestDao = app.container.modelManifestDao
     val allModels by modelManifestDao.getAllModels().collectAsState(initial = emptyList())
     val activeModel = allModels.find { it.activeStatus }
+    val modelState by inferenceEngine.modelState.collectAsState()
 
     
     val coroutineScope = rememberCoroutineScope()
@@ -98,10 +106,16 @@ fun ChatScreen(navController: NavController, sessionId: Long?, mode: String, tar
                             color = TextPrimary
                         )
                         val modelName = activeModel?.displayName ?: "No Model"
+                        val stateText = when (modelState) {
+                            is com.example.backend.models.ModelState.Active -> "using $modelName (${currentTargetLanguage})"
+                            is com.example.backend.models.ModelState.Loading -> "Loading $modelName..."
+                            is com.example.backend.models.ModelState.Failed -> "Model Failed to Load"
+                            else -> "No Model Loaded"
+                        }
                         Text(
-                            text = "via $modelName",
+                            text = stateText,
                             style = MaterialTheme.typography.bodySmall,
-                            color = TextSecondary
+                            color = if (modelState is com.example.backend.models.ModelState.Failed) Color.Red else TextSecondary
                         )
                     }
                 },
@@ -111,8 +125,30 @@ fun ChatScreen(navController: NavController, sessionId: Long?, mode: String, tar
                     }
                 },
                 actions = {
-                    IconButton(onClick = { /* TODO: Session options */ }) {
-                        Icon(Icons.Filled.MoreVert, contentDescription = "Options", tint = TextPrimary)
+                    var menuExpanded by remember { mutableStateOf(false) }
+                    Box {
+                        IconButton(onClick = { menuExpanded = true }) {
+                            Icon(Icons.Filled.MoreVert, contentDescription = "Options", tint = TextPrimary)
+                        }
+                        DropdownMenu(
+                            expanded = menuExpanded,
+                            onDismissRequest = { menuExpanded = false },
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Delete Chat", color = Color.Red) },
+                                onClick = {
+                                    menuExpanded = false
+                                    currentSessionId?.let { sId ->
+                                        coroutineScope.launch {
+                                            chatDao.deleteSession(sId)
+                                            navController.navigateUp()
+                                        }
+                                    }
+                                },
+                                leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = Color.Red) }
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = BgDark)
@@ -204,7 +240,7 @@ fun ChatScreen(navController: NavController, sessionId: Long?, mode: String, tar
                     verticalAlignment = Alignment.Bottom
                 ) {
                     IconButton(
-                        onClick = { navController.navigate("ocr_scanner") },
+                        onClick = { navController.navigate("scan") },
                         modifier = Modifier.padding(bottom = 4.dp)
                     ) {
                         Icon(Icons.Filled.Add, contentDescription = "Attach", tint = TextSecondary)
@@ -226,15 +262,17 @@ fun ChatScreen(navController: NavController, sessionId: Long?, mode: String, tar
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     
-                    if (inputText.isNotBlank()) {
+                    if (inputText.isNotBlank() && !isGenerating) {
+                        val canSend = modelState is com.example.backend.models.ModelState.Active
                         Box(
                             modifier = Modifier
                                 .size(48.dp)
                                 .clip(CircleShape)
-                                .background(AccentTeal)
-                                .clickable {
+                                .background(if (canSend) AccentTeal else MaterialTheme.colorScheme.surfaceVariant)
+                                .clickable(enabled = canSend) {
                                     val text = inputText
                                     inputText = ""
+                                    val currentMessagesSnapshot = messages.toList()
                                     val exceptionHandler = kotlinx.coroutines.CoroutineExceptionHandler { _, throwable ->
                                         coroutineScope.launch(kotlinx.coroutines.Dispatchers.Main) {
                                             isGenerating = false
@@ -265,23 +303,21 @@ fun ChatScreen(navController: NavController, sessionId: Long?, mode: String, tar
                                         try {
                                             isGenerating = true
                                             streamingResponse = ""
-                                            val promptRouter = com.example.backend.inference.PromptRouter()
                                             val postProcessor = com.example.backend.inference.PostProcessor()
-                                            val history = messages.map { com.example.backend.inference.ChatMessage(role = it.role, content = it.content, mode = currentMode, model = activeModel?.modelId ?: "", language = currentTargetLanguage) }
+                                            val history = currentMessagesSnapshot.map { com.example.backend.inference.ChatMessage(role = it.role, content = it.content, mode = currentMode, model = activeModel?.modelId ?: "", language = currentTargetLanguage) }
                                             val manifest = activeModel ?: com.example.backend.models.ModelManifest(modelId = "dummy", displayName = "Dummy", sourceUrl = "", fileName = "", chatTemplate = "fallback")
                                             val scannedTextFromState = navController.currentBackStackEntry?.savedStateHandle?.get<String>("scanned_text") ?: ""
-                                            val routedPrompt = promptRouter.route(
+                                            val enhancedTask = text + if (scannedTextFromState.isNotBlank()) "\n[Context]: $scannedTextFromState" else ""
+                                            
+                                            // Initialize engine if needed (we rely on it being loaded globally)
+                                            val responseFlow = inferenceEngine.generate(
+                                                newTask = enhancedTask,
+                                                history = history,
                                                 mode = currentMode,
                                                 targetLanguage = currentTargetLanguage,
                                                 manifest = manifest,
-                                                history = history,
-                                                newTask = text,
-                                                ocrContext = scannedTextFromState,
-                                                retrievalContext = ""
+                                                jobId = sId.toString()
                                             )
-                                            
-                                            // Initialize engine if needed (we rely on it being loaded globally)
-                                            val responseFlow = inferenceEngine.generate(routedPrompt.builtPrompt, routedPrompt.config)
                                             var fullResponse = ""
                                             var lastUpdateTime = System.currentTimeMillis()
                                             
@@ -319,7 +355,7 @@ fun ChatScreen(navController: NavController, sessionId: Long?, mode: String, tar
                                 .size(48.dp)
                                 .clip(CircleShape)
                                 .background(MaterialTheme.colorScheme.surfaceVariant)
-                                .clickable { },
+                                .clickable { navController.navigate("scan") },
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(Icons.Filled.Add, contentDescription = "Add", tint = TextPrimary, modifier = Modifier.size(24.dp))
@@ -334,6 +370,8 @@ fun ChatScreen(navController: NavController, sessionId: Long?, mode: String, tar
 @Composable
 fun ChatBubble(message: ChatMessageEntity) {
     val isUser = message.role == "user"
+    val clipboardManager = LocalClipboardManager.current
+    val context = LocalContext.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -352,26 +390,45 @@ fun ChatBubble(message: ChatMessageEntity) {
             }
             Spacer(modifier = Modifier.width(8.dp))
         }
-        
-        Surface(
-            color = if (isUser) AccentTeal else SurfaceDark,
-            shape = RoundedCornerShape(
-                topStart = 16.dp,
-                topEnd = 16.dp,
-                bottomStart = if (isUser) 16.dp else 4.dp,
-                bottomEnd = if (isUser) 4.dp else 16.dp
-            ),
-            shadowElevation = if (isUser) 0.dp else 2.dp,
-            modifier = Modifier.widthIn(max = 280.dp)
-        ) {
-            Text(
-                text = message.content,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                color = if (isUser) Color.White else TextPrimary,
-                style = MaterialTheme.typography.bodyLarge
-            )
+        Column {
+            Surface(
+                color = if (isUser) AccentTeal else SurfaceDark,
+                shape = RoundedCornerShape(
+                    topStart = 16.dp,
+                    topEnd = 16.dp,
+                    bottomStart = if (isUser) 16.dp else 4.dp,
+                    bottomEnd = if (isUser) 4.dp else 16.dp
+                ),
+                shadowElevation = if (isUser) 0.dp else 2.dp,
+                modifier = Modifier.widthIn(max = 280.dp)
+            ) {
+                Text(
+                    text = message.content,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    color = if (isUser) Color.White else TextPrimary,
+                    style = MaterialTheme.typography.bodyLarge
+                )
+            }
+            Row(modifier = Modifier.padding(top = 4.dp), horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start) {
+                IconButton(onClick = {
+                    clipboardManager.setText(buildAnnotatedString { append(message.content) })
+                }, modifier = Modifier.size(24.dp)) {
+                    Icon(Icons.Filled.ContentCopy, contentDescription = "Copy", tint = TextSecondary, modifier = Modifier.size(14.dp))
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                IconButton(onClick = {
+                    val sendIntent: Intent = Intent().apply {
+                        action = Intent.ACTION_SEND
+                        putExtra(Intent.EXTRA_TEXT, message.content)
+                        type = "text/plain"
+                    }
+                    val shareIntent = Intent.createChooser(sendIntent, null)
+                    context.startActivity(shareIntent)
+                }, modifier = Modifier.size(24.dp)) {
+                    Icon(Icons.Filled.Share, contentDescription = "Share", tint = TextSecondary, modifier = Modifier.size(14.dp))
+                }
+            }
         }
-        
         if (isUser) {
             Spacer(modifier = Modifier.width(8.dp))
             Box(
@@ -386,7 +443,6 @@ fun ChatBubble(message: ChatMessageEntity) {
         }
     }
 }
-
 @Composable
 fun ThinkingAnimation() {
     Row(
