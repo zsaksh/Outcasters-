@@ -42,10 +42,7 @@ Outcasters follows **Clean Architecture** combined with **MVVM** and modern Andr
 - **Device Requirements**: A physical device with at least 4GB of RAM is recommended for running on-device models like Gemma 2B.
 
 ### Installation
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/yourusername/outcasters.git
-   ```
+1. Clone the repository
 2. Open the project in Android Studio.
 3. Sync the project with Gradle files.
 4. Build and run the app on your device or emulator.
