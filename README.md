@@ -39,7 +39,7 @@ Outcasters follows **Clean Architecture** combined with **MVVM** and modern Andr
 - Android Studio Ladybug or newer.
 - Minimum SDK: API 24 (Android 7.0)
 - Target SDK: API 35 (Android 15)
-- **Device Requirements**: A physical device with at least 4GB of RAM is recommended for running on-device models like Gemma 2B.
+- **Device Requirements**: A physical device with at least 6GB of RAM is recommended for running on-device models like Gemma 2B.
 
 ### Installation
 1. Clone the repository
